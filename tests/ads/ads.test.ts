@@ -16,7 +16,9 @@ type Listener = (event: { slot: GptSlot; isEmpty?: boolean }) => void
 /** Um googletag falso que roda os comandos na hora e guarda o que a tag pediu. */
 function fakeGoogletag() {
   const listeners: Record<string, Listener[]> = {}
-  const slots: Array<GptSlot & { path: string; format?: number; elementId?: string }> = []
+  const slots: Array<
+    GptSlot & { path: string; format?: number; elementId?: string; configs: Array<Record<string, unknown>> }
+  > = []
   const refreshed: GptSlot[] = []
   const displayed: Array<GptSlot | string> = []
   const configs: Array<Record<string, unknown>> = []
@@ -27,11 +29,15 @@ function fakeGoogletag() {
   }
   /** Cria um slot falso. */
   const slot = (path: string, extra: { format?: number; elementId?: string }) => {
+    const configs: Array<Record<string, unknown>> = []
     const created = {
       path,
       ...extra,
+      configs,
       addService: () => created,
-      setConfig: () => undefined,
+      setConfig: (config: Record<string, unknown>) => {
+        configs.push(config)
+      },
       getSlotElementId: () => extra.elementId ?? '',
     }
     slots.push(created)
@@ -149,6 +155,28 @@ describe('startAds', () => {
     ])
     fake.emit('impressionViewable', { slot: fake.slots[0] as GptSlot })
     await expect(run.firstViewable).resolves.toBeUndefined()
+  })
+})
+
+describe('regras de preço', () => {
+  it('espera as keys da regra e põe o grupo na página e o floor no bloco', async () => {
+    const fake = fakeGoogletag()
+    ;(window as Window & { googletag?: GoogleTag }).googletag = fake.googletag
+    const targeting = Promise.resolve({
+      page: { groone_group: 'regra' },
+      slot: (path: string): Record<string, string> => (path.includes('Content1') ? { groone_prices: '1.01' } : {}),
+    })
+    startAds(tagWith([block({}), block({ unit_type: 'Anchor', kind: 'anchor', edge: 'top', desktop: '/2100/blog.com/Blog_Anchor_Desktop_20261028' })]), {
+      target: window,
+      origin: 'https://avant.groone.com',
+      device: 'desktop',
+      language: 'pt',
+      targeting,
+    })
+    await vi.advanceTimersByTimeAsync(500)
+    expect(fake.configs[0]?.targeting).toMatchObject({ groone_group: 'regra', land_uri: '/' })
+    expect(fake.slots[0]?.configs).toContainEqual({ targeting: { groone_prices: '1.01' } })
+    expect(fake.slots[1]?.configs).toEqual([])
   })
 })
 

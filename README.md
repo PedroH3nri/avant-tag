@@ -20,7 +20,10 @@ A chave (`data-tag`) é a da ad tag no painel. A API só entrega a configuraçã
 página é o do site da tag.
 
 O `tag.js` roda nesta ordem: guarda (uma vez por página), configuração (com a cópia do
-`localStorage` se a API falhar), loader, visitas, anúncios, Analytics, MGID e reward. O reward só
+`localStorage` se a API falhar), regras de preço, loader, visitas, anúncios, Analytics, MGID e
+reward. Com a opção de regras de preço ligada, a tag busca `GET /api/tag/prices?key=&hash=` junto
+com o GPT e espera até 300 ms: o visitante cai no grupo `controle` (sem floor) ou `regra` pela faixa
+do `visitor_id`, a página leva `groone_group` e cada bloco com floor leva `groone_prices`. O reward só
 abre se o offerwall do Google não aparecer em 2,5 s. Com o `tag.js` e o `reward.js` na mesma
 página, o reward roda uma vez: quem chega primeiro roda e o outro desiste.
 
@@ -36,6 +39,7 @@ src/
   loader/             loader e aviso de adblock (render usado também na prévia do painel)
   ads/                GPT, blocos no lugar, key-values, refresh
   page-views/         uma página vista, um envio para /api/tag/page-views
+  price-rules/        floors das regras de preço e grupo de controle (groone_prices, groone_group)
   mgid/, analytics/   integrações
   reward/             reward e quiz (veio do avant-web)
 tests/                Vitest + jsdom

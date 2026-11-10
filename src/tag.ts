@@ -1,16 +1,27 @@
 /**
  * Entrada do tag.js, a ad tag do Avant no site do cliente:
  * `<script async src="https://avant.groone.com/tag.js" data-tag="{chave}"></script>`.
- * A ordem: guarda, configuração, loader, visitas, anúncios, Analytics, MGID e reward.
+ * A ordem: guarda, configuração, regras de preço, loader, visitas, anúncios, Analytics, MGID e reward.
  */
 
 import { startAds, type AdsRun } from './ads'
 import { startAnalytics } from './analytics'
-import { browserLanguage, claimPage, detectDevice, domReady, findTagScript, loadConfig, normalizeDomain, safely } from './core'
+import {
+  browserLanguage,
+  claimPage,
+  contentHash,
+  detectDevice,
+  domReady,
+  findTagScript,
+  loadConfig,
+  normalizeDomain,
+  safely,
+} from './core'
 import type { PublicAdTag, PublicBlock } from './core/types'
 import { detectAdblock, LOADER_LANGUAGES, startLoader } from './loader'
 import { insertArticle, startMgid } from './mgid'
-import { startPageViews } from './page-views'
+import { startPageViews, visitorId } from './page-views'
+import { adTargeting, startPriceRules } from './price-rules'
 import { offerwallShown, startReward } from './reward/index'
 
 export interface TagRun {
@@ -51,11 +62,25 @@ export async function runTag(target: Window = window): Promise<TagRun | null> {
   void adblock.then((found) => {
     adblockSeen = found
   })
+  const targeting = config.price_rules
+    ? safely(() =>
+        startPriceRules(target, script.origin, script.key, contentHash(target.location.hostname, target.location.pathname), visitorId(target))
+          .then((run) => (run ? adTargeting(run) : null))
+          .catch(() => null),
+      )
+    : null
   let ads: AdsRun | null = null
   /** Os anúncios começam quando o conteúdo da página já existe. */
   const adsStarted = domReady(target).then(() => {
     ads = safely(() =>
-      startAds(config, { target, origin: script.origin, device, language, onEmpty: emptyBlockHandler(target, config) }),
+      startAds(config, {
+        target,
+        origin: script.origin,
+        device,
+        language,
+        onEmpty: emptyBlockHandler(target, config),
+        targeting: targeting ?? undefined,
+      }),
     )
     return ads
   })
