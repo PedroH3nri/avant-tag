@@ -1,0 +1,32 @@
+# Cria a tag vX.Y.Z quando o develop chega a uma versão do package.json que ainda não tem tag.
+# Para lançar uma versão, basta subir o campo version no PR.
+name: Release
+
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Cria a tag da versão, se ainda não existir
+        run: |
+          version=$(node -p "require('./package.json').version")
+          tag="v${version}"
+          if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+            echo "A tag ${tag} já existe; nada a fazer."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${tag}" -m "avant-tag ${tag}"
+          git push origin "${tag}"
+          echo "Tag ${tag} criada em $(git rev-parse --short HEAD)."
