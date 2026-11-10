@@ -1,0 +1,18 @@
+{
+  "env": {
+    "SUPERPOWERS_DISABLE_TELEMETRY": "1"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}

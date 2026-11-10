@@ -1,0 +1,34 @@
+{
+  "name": "avant-tag",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "pnpm@10.28.0",
+  "description": "Código que roda no site do cliente do Groone Avant: tag.js (ad tag com o reward) e reward.js.",
+  "files": [
+    "src"
+  ],
+  "exports": {
+    "./tag": "./src/tag.ts",
+    "./reward-script": "./src/reward.ts",
+    "./loader": "./src/loader/index.ts",
+    "./reward": "./src/reward/index.ts",
+    "./ads": "./src/ads/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit && ENTRY=tag vite build && ENTRY=reward vite build",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint src tests",
+    "clean-code": "node scripts/clean-code.mjs",
+    "test": "vitest run",
+    "size": "node scripts/size.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "jsdom": "^30.1.3",
+    "oxlint": "^1.89.0",
+    "typescript": "~6.0.3",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  }
+}
