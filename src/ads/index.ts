@@ -26,12 +26,18 @@ export interface BlockResult {
   state: BlockState
 }
 
+export interface AdTargeting {
+  page: Record<string, string>
+  slot: (path: string) => Record<string, string>
+}
+
 export interface AdsDeps {
   target: Window
   origin: string
   device: Device
   language: string
   onEmpty?: (block: PublicBlock, container: HTMLElement | null) => void
+  targeting?: Promise<AdTargeting | null>
 }
 
 export interface AdsRun {
@@ -97,18 +103,26 @@ export function startAds(config: PublicAdTag, deps: AdsDeps): AdsRun {
   const blocks = pageBlocks(config, deps.device, target.location.pathname)
   target.setTimeout(() => {
     if (blocks.length === 0 || overlayCovers(target)) return
+    void (deps.targeting ?? Promise.resolve(null)).catch(() => null).then((extra) => showBlocks(extra))
+  }, SECURITY_DELAY_MS)
+  /** Põe os blocos na página com os key-values e as keys das regras de preço, quando há. */
+  const showBlocks = (extra: AdTargeting | null): void => {
     const values = pageKeyValues(target)
     const firstPath = blockPath(blocks[0] as PublicBlock, deps.device) ?? ''
     reportKeyValues(deps, values, networkOfPath(firstPath))
     const placed = blocks.map((block) => ({ block, container: placeBlock(page, block) }))
     googletag.cmd.push(() => {
-      googletag.setConfig({ targeting: values, ...(config.lazy_load ? { lazyLoad: LAZY_LOAD } : {}) })
+      const targeting = { ...values, ...(extra?.page ?? {}) }
+      googletag.setConfig({ targeting, ...(config.lazy_load ? { lazyLoad: LAZY_LOAD } : {}) })
       const defined: Defined[] = []
       const refreshing = new Set<GptSlot>()
       for (const { block, container } of placed) {
         if (block.kind === 'content' && !container) continue
-        const slot = defineSlot(googletag, block, blockPath(block, deps.device) as string, deps.device)
+        const path = blockPath(block, deps.device) as string
+        const slot = defineSlot(googletag, block, path, deps.device)
         if (!slot) continue
+        const slotTargeting = extra?.slot(path) ?? {}
+        if (Object.keys(slotTargeting).length > 0) slot.setConfig({ targeting: slotTargeting })
         slot.addService(googletag.pubads())
         defined.push({ block, slot, container })
       }
@@ -137,7 +151,7 @@ export function startAds(config: PublicAdTag, deps: AdsDeps): AdsRun {
         googletag.display(block.kind === 'content' || block.kind === 'fixed' ? blockElementId(block) : slot)
       }
     })
-  }, SECURITY_DELAY_MS)
+  }
   return {
     gptReady: ready,
     firstViewable,
