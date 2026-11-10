@@ -6,7 +6,7 @@ de mudar algo.
 - Regra de negócio fica no avant-core e na API. A tag só lê a configuração pública
   (`GET /api/tag/config`) e manda o que viu (`POST /api/tag/page-views`, reward).
 - Formatos da API em `src/core/types.ts`, iguais aos `dto.py` do avant-api
-  (`modules/ad_tag_public`).
+  (`modules/ad_tag_public` e `modules/price_floor_public`).
 - Um módulo por assunto em `src/<módulo>/` (core, loader, ads, page-views, price-rules, mgid, analytics,
   reward), com `index.ts` reexportando. Cada módulo recebe a janela e as saídas por parâmetro e
   tem teste com jsdom em `tests/<módulo>/`.

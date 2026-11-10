@@ -56,6 +56,12 @@ export interface PublicAdTag {
   blocks: PublicBlock[]
 }
 
+/** Os floors do `content_hash` (`GET /api/tag/prices`, `PublicPriceFloorsOut` da API). */
+export interface PriceFloorsResponse {
+  control_percent: number | null
+  floors: Record<string, string>
+}
+
 export interface PublicTagResponse {
   tag: PublicAdTag | null
 }

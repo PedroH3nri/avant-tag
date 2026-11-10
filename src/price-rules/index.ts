@@ -6,6 +6,7 @@
  */
 
 import { pageHash } from '../core/hash'
+import type { PriceFloorsResponse } from '../core/types'
 
 export const PRICE_KEY = 'groone_prices'
 export const GROUP_KEY = 'groone_group'
@@ -14,11 +15,6 @@ export const CONTROL_GROUP = 'controle'
 export const FLOORS_TIMEOUT_MS = 300
 
 const BLOCK_NAME = /^[^_]+_(.+)_\d{8}$/
-
-export interface PriceFloorsResponse {
-  control_percent: number | null
-  floors: Record<string, string>
-}
 
 export interface PriceRulesRun {
   group: typeof RULE_GROUP | typeof CONTROL_GROUP
