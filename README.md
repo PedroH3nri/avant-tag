@@ -19,6 +19,11 @@ avant-infra.
 A chave (`data-tag`) é a da ad tag no painel. A API só entrega a configuração quando o domínio da
 página é o do site da tag.
 
+O `tag.js` roda nesta ordem: guarda (uma vez por página), configuração (com a cópia do
+`localStorage` se a API falhar), loader, visitas, anúncios, Analytics, MGID e reward. O reward só
+abre se o offerwall do Google não aparecer em 2,5 s. Com o `tag.js` e o `reward.js` na mesma
+página, o reward roda uma vez: quem chega primeiro roda e o outro desiste.
+
 ## Estrutura
 
 TypeScript sem framework, em módulos. Cada um recebe a janela e as saídas por parâmetro, e os
