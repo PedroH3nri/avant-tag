@@ -13,12 +13,16 @@ export const GROUP_KEY = 'groone_group'
 export const RULE_GROUP = 'regra'
 export const CONTROL_GROUP = 'controle'
 export const FLOORS_TIMEOUT_MS = 300
+export const TRY_KEY = 'groone_try'
+export const CASCADE_TRIES = 4
+export const CASCADE_MAX_MS = 3000
 
 const BLOCK_NAME = /^[^_]+_(.+)_\d{8}$/
 
 export interface PriceRulesRun {
   group: typeof RULE_GROUP | typeof CONTROL_GROUP
   floors: Record<string, string>
+  cascades: Record<string, string[]>
 }
 
 /** O bloco da regra pelo caminho do ad unit: `/2100/blog.com/Blog_Content3_Mobile_20261028` vira `Content3_Mobile`. */
@@ -69,7 +73,12 @@ export async function startPriceRules(
   const response = await fetchFloors(target, origin, key, contentHash)
   if (!response || response.control_percent === null) return null
   const group = groupOf(visitorId, response.control_percent)
-  return { group, floors: group === RULE_GROUP ? response.floors : {} }
+  const isRule = group === RULE_GROUP
+  return {
+    group,
+    floors: isRule ? response.floors : {},
+    cascades: isRule ? (response.cascades ?? {}) : {},
+  }
 }
 
 /** O valor de `groone_prices` do bloco no caminho, ou nada sem floor para ele. */
@@ -78,13 +87,23 @@ export function floorOfPath(run: PriceRulesRun | null, path: string): string | n
   return run && block ? (run.floors[block] ?? null) : null
 }
 
-/** As keys da regra para os anúncios: o grupo na página e o floor em cada bloco. */
+/** A escada de floors do bloco no caminho, ou nada sem escada (controle e blocos fora da Cascata). */
+export function cascadeOfPath(run: PriceRulesRun | null, path: string): string[] | null {
+  const block = blockOfPath(path)
+  const ladder = run && block ? run.cascades[block] : undefined
+  return ladder && ladder.length > 0 ? ladder : null
+}
+
+/** As keys da regra para os anúncios: o grupo na página, e em cada bloco o 1º degrau ou o floor. */
 export function adTargeting(run: PriceRulesRun) {
   return {
     page: { [GROUP_KEY]: run.group },
     slot: (path: string): Record<string, string> => {
+      const ladder = cascadeOfPath(run, path)
+      if (ladder) return { [PRICE_KEY]: ladder[0] as string, [TRY_KEY]: '1' }
       const floor = floorOfPath(run, path)
       return floor ? { [PRICE_KEY]: floor } : {}
     },
+    cascade: (path: string): string[] | null => cascadeOfPath(run, path),
   }
 }
