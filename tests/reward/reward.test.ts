@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { showRewardedAd } from '../../src/reward/ads'
+import { VISITOR_KEY } from '../../src/page-views'
 import { REWARD_CASCADE_ENABLED } from '../../src/ads/cascade'
-import { apiOrigin, armTrigger, rewardCascade } from '../../src/reward/start'
+import { apiOrigin, armTrigger, rewardCascade, startReward } from '../../src/reward/start'
 import { renderReward } from '../../src/reward/render'
 import { rewardSteps, stepEventName } from '../../src/reward/steps'
 import { visitorLanguage } from '../../src/reward/texts'
@@ -309,12 +310,15 @@ describe('Cascata no anúncio premiado', () => {
     const slots: FakeSlot[] = []
     const refresh = vi.fn()
     const destroySlots = vi.fn(() => true)
+    const pageConfigs: Array<Record<string, unknown>> = []
+    const slotFailure = { active: false }
     const defineOutOfPageSlot = vi.fn((path: string) => {
       const slot: FakeSlot = {
         path,
         targeting: {},
         addService: () => slot,
         setConfig: (config) => {
+          if (slotFailure.active) throw new Error('setConfig falhou')
           for (const [key, value] of Object.entries(config.targeting)) {
             if (value === null) delete slot.targeting[key]
             else slot.targeting[key] = value
@@ -332,16 +336,17 @@ describe('Cascata no anúncio premiado', () => {
         addEventListener: (name: string, listener: (event: object) => void) => listeners.set(name, listener),
         refresh,
       }),
+      setConfig: (config: Record<string, unknown>) => pageConfigs.push(config),
       enableServices: () => undefined,
       display: () => undefined,
       destroySlots,
     }
     /** Dispara o vazio do slot. */
     const empty = (slot: object) => listeners.get('slotRenderEnded')?.({ slot, isEmpty: true })
-    return { listeners, slots, refresh, destroySlots, defineOutOfPageSlot, empty }
+    return { listeners, slots, refresh, destroySlots, defineOutOfPageSlot, empty, pageConfigs, slotFailure }
   }
 
-  const ladderOf = (path: string): string[] | null => (path === PATH_A ? LADDER : null)
+  const ladderOf = { group: 'regra', ladderOfPath: (path: string): string[] | null => (path === PATH_A ? LADDER : null) }
 
   afterEach(() => {
     vi.useRealTimers()
@@ -412,21 +417,116 @@ describe('Cascata no anúncio premiado', () => {
     })
 
     it('com a flag desligada não monta escada, mesmo com regra', () => {
-      expect(rewardCascade(rules, 'visitante', false)).toBeUndefined()
+      expect(rewardCascade(rules, () => 'visitante', false)).toBeUndefined()
     })
 
     it('sem regra na resposta não monta escada', () => {
-      expect(rewardCascade(null, 'visitante', true)).toBeUndefined()
+      expect(rewardCascade(null, () => 'visitante', true)).toBeUndefined()
     })
 
-    it('o grupo de controle fica sem escada', () => {
-      expect(rewardCascade({ ...rules, control_percent: 100 }, 'visitante', true)).toBeUndefined()
+    it('o grupo de controle recebe o grupo e nenhuma escada', () => {
+      const control = rewardCascade({ ...rules, control_percent: 100 }, () => 'visitante', true)
+      expect(control?.group).toBe('controle')
+      expect(control?.ladderOfPath(PATH_A)).toBeNull()
     })
 
     it('o grupo da regra recebe a escada do bloco do caminho', () => {
-      const ladderOfPath = rewardCascade(rules, 'visitante', true)
-      expect(ladderOfPath?.(PATH_A)).toEqual(LADDER)
-      expect(ladderOfPath?.(PATH_B)).toBeNull()
+      const cascade = rewardCascade(rules, () => 'visitante', true)
+      expect(cascade?.group).toBe('regra')
+      expect(cascade?.ladderOfPath(PATH_A)).toEqual(LADDER)
+      expect(cascade?.ladderOfPath(PATH_B)).toBeNull()
+    })
+
+    it('com a flag desligada não pergunta pelo visitante', () => {
+      const visitor = vi.fn(() => 'visitante')
+      rewardCascade(rules, visitor, false)
+      rewardCascade(null, visitor, true)
+      expect(visitor).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('groone_group e falhas', () => {
+    it('com a escada ativa põe o groone_group da regra na página', () => {
+      const { pageConfigs } = cascadeGoogleTag()
+      void showRewardedAd([PATH_A], window, ladderOf)
+      expect(pageConfigs).toEqual([{ targeting: { groone_group: 'regra' } }])
+    })
+
+    it('o controle leva groone_group controle, sem escada nem key de preço', () => {
+      const { pageConfigs, slots, refresh, empty } = cascadeGoogleTag()
+      void showRewardedAd([PATH_A, PATH_B], window, { group: 'controle', ladderOfPath: () => null })
+      expect(pageConfigs).toEqual([{ targeting: { groone_group: 'controle' } }])
+      expect(slots[0]?.targeting).toEqual({})
+      empty(slots[0] as object)
+      expect(refresh).not.toHaveBeenCalled()
+    })
+
+    it('sem cascata não mexe na página', () => {
+      const { pageConfigs } = cascadeGoogleTag()
+      void showRewardedAd([PATH_A], window)
+      expect(pageConfigs).toEqual([])
+    })
+
+    it('se o setConfig da 1ª tentativa falha, segue sem escada naquele caminho', () => {
+      const { slots, refresh, defineOutOfPageSlot, empty, slotFailure } = cascadeGoogleTag()
+      slotFailure.active = true
+      void showRewardedAd([PATH_A, PATH_B], window, ladderOf)
+      empty(slots[0] as object)
+      expect(refresh).not.toHaveBeenCalled()
+      expect(defineOutOfPageSlot).toHaveBeenCalledTimes(2)
+    })
+
+    it('evento tardio do slot destruído depois dos 3000 ms é ignorado', async () => {
+      vi.useFakeTimers()
+      const { listeners, slots, empty, refresh } = cascadeGoogleTag()
+      const result = showRewardedAd([PATH_A], window, ladderOf)
+      empty(slots[0] as object)
+      vi.advanceTimersByTime(3001)
+      const visible = vi.fn()
+      listeners.get('rewardedSlotReady')?.({ slot: slots[0], makeRewardedVisible: visible })
+      listeners.get('rewardedSlotGranted')?.({ slot: slots[0] })
+      empty(slots[0] as object)
+      expect(visible).not.toHaveBeenCalled()
+      expect(refresh).toHaveBeenCalledTimes(1)
+      expect(await result).toBe('unavailable')
+    })
+
+    it('o READY_TIMEOUT_MS ainda responde unavailable com a escada ativa', async () => {
+      vi.useFakeTimers()
+      cascadeGoogleTag()
+      const result = showRewardedAd([PATH_A], window, ladderOf)
+      vi.advanceTimersByTime(10_001)
+      expect(await result).toBe('unavailable')
+    })
+  })
+
+  describe('startReward', () => {
+    /** Roda o startReward com uma resposta falsa da API e devolve o que foi lido ou gravado. */
+    async function runStart(priceRules: unknown) {
+      window.localStorage.clear()
+      const setItem = vi.spyOn(Storage.prototype, 'setItem')
+      const reward = sampleReward({ ad_units: { desktop: [PATH_A], mobile: [PATH_A] } })
+      const fetchFake = vi.fn(async () => ({ ok: true, json: async () => ({ reward, price_rules: priceRules }) }))
+      const original = window.fetch
+      window.fetch = fetchFake as unknown as typeof window.fetch
+      const { pageConfigs, slots } = cascadeGoogleTag()
+      const widget = await startReward('https://api.groone.com', window)
+      window.fetch = original
+      const stored = setItem.mock.calls.map((call) => call[0])
+      setItem.mockRestore()
+      return { widget, stored, pageConfigs, slots }
+    }
+
+    it('com a flag desligada não grava o visitante nem mexe no GPT', async () => {
+      const { widget, stored, pageConfigs } = await runStart({ control_percent: 0, cascades: { RewardsA: LADDER } })
+      expect(widget).not.toBeNull()
+      expect(stored).not.toContain(VISITOR_KEY)
+      expect(pageConfigs).toEqual([])
+    })
+
+    it('sem price_rules também não grava o visitante', async () => {
+      const { stored } = await runStart(null)
+      expect(stored).not.toContain(VISITOR_KEY)
     })
   })
 })

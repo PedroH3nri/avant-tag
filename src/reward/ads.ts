@@ -3,6 +3,8 @@
  * ad units na ordem e avisa quando a pessoa ganhou o prêmio, fechou ou não houve anúncio.
  */
 
+import { safely } from '../core/safely'
+import { GROUP_KEY } from '../price-rules'
 import { startCascade, tryTargeting, type Cascade } from '../ads/cascade'
 import type { GptSlot } from '../ads/gpt'
 
@@ -12,6 +14,11 @@ const READY_TIMEOUT_MS = 10_000
 export type RewardedSlot = GptSlot
 
 export type LadderOfPath = (path: string) => string[] | null
+
+export interface RewardCascade {
+  group: string
+  ladderOfPath: LadderOfPath
+}
 
 interface SlotEvent {
   slot: RewardedSlot
@@ -25,9 +32,9 @@ export interface GoogleTag {
   defineOutOfPageSlot(path: string, format: number): RewardedSlot | null
   pubads(): {
     addEventListener(name: string, listener: (event: SlotEvent) => void): void
-    removeEventListener(name: string, listener: (event: SlotEvent) => void): void
     refresh(slots: RewardedSlot[]): void
   }
+  setConfig(config: Record<string, unknown>): void
   enableServices(): void
   display(slot: RewardedSlot): void
   destroySlots(slots?: RewardedSlot[]): boolean
@@ -50,7 +57,7 @@ export function loadGoogleTag(target: Window = window): void {
 }
 
 /** Mostra o anúncio premiado de um dos caminhos e responde como terminou; sem anúncio, `unavailable`. */
-export function showRewardedAd(paths: string[], target: Window = window, ladderOfPath?: LadderOfPath): Promise<AdOutcome> {
+export function showRewardedAd(paths: string[], target: Window = window, rewardCascade?: RewardCascade): Promise<AdOutcome> {
   return new Promise((resolve) => {
     if (paths.length === 0) return resolve('unavailable')
     loadGoogleTag(target)
@@ -79,10 +86,9 @@ export function showRewardedAd(paths: string[], target: Window = window, ladderO
       current.addService(googletag.pubads())
       pending = rest
       cascade = null
-      const ladder = ladderOfPath?.(path)
-      if (ladder) {
-        const slot = current
-        slot.setConfig({ targeting: tryTargeting(ladder, 1) })
+      const ladder = rewardCascade?.ladderOfPath(path)
+      const slot = current
+      if (ladder && safely(() => slot.setConfig({ targeting: tryTargeting(ladder, 1) })) !== null) {
         cascade = startCascade({ target, googletag, slot, ladder, onExpire: () => moveOn(googletag, slot) })
       }
       googletag.display(current)
@@ -118,6 +124,7 @@ export function showRewardedAd(paths: string[], target: Window = window, ladderO
       ads.addEventListener('rewardedSlotClosed', (event) => {
         if (event.slot === current) finish(granted ? 'granted' : 'closed')
       })
+      if (rewardCascade) safely(() => googletag.setConfig({ targeting: { [GROUP_KEY]: rewardCascade.group } }))
       googletag.enableServices()
       tryNext(googletag, paths)
     })

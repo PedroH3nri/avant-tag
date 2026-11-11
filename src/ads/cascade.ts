@@ -7,7 +7,7 @@
 import { safely } from '../core/safely'
 import type { BlockKind } from '../core/types'
 import { CASCADE_MAX_MS, CASCADE_TRIES, PRICE_KEY, TRY_KEY } from '../price-rules'
-import type { GoogleTag, GptSlot } from './gpt'
+import type { GptSlot } from './gpt'
 
 export const CASCADE_KINDS: readonly BlockKind[] = ['anchor', 'fixed']
 
@@ -15,7 +15,7 @@ export const REWARD_CASCADE_ENABLED = false
 
 export interface CascadeDeps {
   target: Window
-  googletag: Pick<GoogleTag, 'pubads'> | { pubads(): { refresh(slots: GptSlot[]): void } }
+  googletag: { pubads(): { refresh(slots: GptSlot[]): void } }
   slot: GptSlot
   ladder: string[]
   onExpire?: () => void

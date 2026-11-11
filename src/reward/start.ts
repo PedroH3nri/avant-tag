@@ -7,7 +7,7 @@ import { REWARD_CASCADE_ENABLED } from '../ads/cascade'
 import { localStore } from '../core/config'
 import { visitorId } from '../page-views'
 import { blockOfPath, groupOf, RULE_GROUP } from '../price-rules'
-import { showRewardedAd, type LadderOfPath } from './ads'
+import { showRewardedAd, type RewardCascade } from './ads'
 import type { PublicReward, PublicRewardPage, RewardPriceRules } from './types'
 import { coolingDown, deviceAdUnits, RewardWidget, type LeadBody, type RewardEvent, type WidgetPorts } from './widget'
 
@@ -21,7 +21,7 @@ export function apiOrigin(scriptSource: string | undefined, fallback: string): s
 }
 
 /** As saídas reais do script: beacon para eventos, fetch para o contato, GPT para o anúncio. */
-export function browserPorts(origin: string, target: Window = window, ladderOfPath?: LadderOfPath): WidgetPorts {
+export function browserPorts(origin: string, target: Window = window, cascade?: RewardCascade): WidgetPorts {
   return {
     /** Manda o lote por beacon (sobrevive à saída da página); sem beacon, por fetch. */
     sendEvents(events: RewardEvent[]) {
@@ -44,23 +44,28 @@ export function browserPorts(origin: string, target: Window = window, ladderOfPa
         return false
       }
     },
-    showAd: (paths) => showRewardedAd(paths, target, ladderOfPath),
+    showAd: (paths) => showRewardedAd(paths, target, cascade),
     now: () => Date.now(),
     storage: localStore(target),
   }
 }
 
-/** A escada do bloco de cada caminho; nada com a flag desligada, sem regra ou no grupo de controle. */
+/** O grupo e a escada de cada caminho; nada com a flag desligada ou sem regra, e sem escada no controle. */
 export function rewardCascade(
   rules: RewardPriceRules | null,
-  visitor: string,
+  visitor: () => string,
   enabled: boolean = REWARD_CASCADE_ENABLED,
-): LadderOfPath | undefined {
-  if (!enabled || !rules || groupOf(visitor, rules.control_percent) !== RULE_GROUP) return undefined
-  return (path) => {
-    const block = blockOfPath(path)
-    const ladder = block ? rules.cascades[block] : undefined
-    return ladder && ladder.length > 0 ? ladder : null
+): RewardCascade | undefined {
+  if (!enabled || !rules) return undefined
+  const group = groupOf(visitor(), rules.control_percent)
+  if (group !== RULE_GROUP) return { group, ladderOfPath: () => null }
+  return {
+    group,
+    ladderOfPath: (path) => {
+      const block = blockOfPath(path)
+      const ladder = block ? rules.cascades[block] : undefined
+      return ladder && ladder.length > 0 ? ladder : null
+    },
   }
 }
 
@@ -107,7 +112,7 @@ export async function startReward(origin: string, target: Window = window): Prom
     const response = await target.fetch(`${origin}/api/reward/v2?url=${encodeURIComponent(target.location.href)}`)
     if (!response.ok) return null
     const { reward, price_rules: rules } = (await response.json()) as PublicRewardPage
-    const ports = browserPorts(origin, target, rewardCascade(rules ?? null, visitorId(target)))
+    const ports = browserPorts(origin, target, rewardCascade(rules ?? null, () => visitorId(target)))
     if (!reward || deviceAdUnits(reward, target.innerWidth).length === 0 || coolingDown(reward, ports)) return null
     const widget = new RewardWidget(reward, ports, target)
     armTrigger(reward, () => widget.open(), target)

@@ -5,7 +5,7 @@
 export const GPT_SOURCE = 'https://securepubads.g.doubleclick.net/tag/js/gpt.js'
 
 export interface GptSlot {
-  addService(service: GptPubAds): GptSlot
+  addService(service: unknown): GptSlot
   setConfig(config: Record<string, unknown>): void
   getSlotElementId(): string
 }
