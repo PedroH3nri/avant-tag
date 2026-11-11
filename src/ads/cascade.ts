@@ -11,9 +11,11 @@ import type { GoogleTag, GptSlot } from './gpt'
 
 export const CASCADE_KINDS: readonly BlockKind[] = ['anchor', 'fixed']
 
+export const REWARD_CASCADE_ENABLED = false
+
 export interface CascadeDeps {
   target: Window
-  googletag: GoogleTag
+  googletag: Pick<GoogleTag, 'pubads'> | { pubads(): { refresh(slots: GptSlot[]): void } }
   slot: GptSlot
   ladder: string[]
   onExpire?: () => void

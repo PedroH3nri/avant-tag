@@ -56,6 +56,16 @@ export interface PublicReward {
   ad_units: { desktop: string[]; mobile: string[] }
 }
 
+export interface RewardPriceRules {
+  control_percent: number
+  cascades: Record<string, string[]>
+}
+
+export interface PublicRewardPage {
+  reward: PublicReward | null
+  price_rules: RewardPriceRules | null
+}
+
 export type RewardStep =
   | { kind: 'question'; index: number }
   | { kind: 'lead' }
