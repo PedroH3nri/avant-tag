@@ -24,13 +24,13 @@ export interface Cascade {
   done(): void
 }
 
-/** As keys da tentativa: o degrau e o número dela; a última tentativa sai sem preço. */
-export function tryTargeting(ladder: string[], attempt: number): Record<string, string> {
+/** As keys da tentativa: o degrau e o número dela; sem preço, `groone_prices` é null para o GPT apagar a key. */
+export function tryTargeting(ladder: string[], attempt: number): Record<string, string | null> {
   const price = attempt < CASCADE_TRIES ? ladder[attempt - 1] : undefined
-  return price ? { [PRICE_KEY]: price, [TRY_KEY]: String(attempt) } : { [TRY_KEY]: String(attempt) }
+  return { [PRICE_KEY]: price ?? null, [TRY_KEY]: String(attempt) }
 }
 
-/** Começa o laço do slot; `onEmpty` devolve se pediu de novo e `done` encerra o laço. */
+/** Começa o laço do slot; o teto de 3000 ms conta da montagem, logo antes do 1º pedido, sem esperar o `slotRequested`. */
 export function startCascade(deps: CascadeDeps): Cascade {
   const { target, googletag, slot, ladder } = deps
   const startedAt = Date.now()

@@ -94,12 +94,12 @@ export function cascadeOfPath(run: PriceRulesRun | null, path: string): string[]
   return ladder && ladder.length > 0 ? ladder : null
 }
 
-/** As keys da regra para os anúncios: o grupo na página, e em cada bloco o 1º degrau ou o floor. */
+/** As keys da regra para os anúncios: o grupo na página, e em cada bloco o 1º degrau (se entra na Cascata) ou o floor. */
 export function adTargeting(run: PriceRulesRun) {
   return {
     page: { [GROUP_KEY]: run.group },
-    slot: (path: string): Record<string, string> => {
-      const ladder = cascadeOfPath(run, path)
+    slot: (path: string, cascading = true): Record<string, string> => {
+      const ladder = cascading ? cascadeOfPath(run, path) : null
       if (ladder) return { [PRICE_KEY]: ladder[0] as string, [TRY_KEY]: '1' }
       const floor = floorOfPath(run, path)
       return floor ? { [PRICE_KEY]: floor } : {}

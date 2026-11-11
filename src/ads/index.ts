@@ -5,14 +5,13 @@
 
 import { sendBeacon } from '../core/beacon'
 import { blockAllowed } from '../core/paths'
-import type { Device, PublicAdTag, PublicBlock } from '../core/types'
 import { safely } from '../core/safely'
+import type { Device, PublicAdTag, PublicBlock } from '../core/types'
 import { CASCADE_KINDS, startCascade, tryTargeting, type Cascade } from './cascade'
 import { ensureGpt, gptReady, type GoogleTag, type GptSlot, type GptSlotEvent } from './gpt'
 import { addLabels, blockElementId, placeBlock } from './placement'
 import { startRefresh } from './refresh'
 import { overlayCovers } from './security'
-import { TRY_KEY } from '../price-rules'
 import { networkOfPath, pageKeyValues } from './targeting'
 
 export { ensureGpt, GPT_SOURCE, gptReady, type GoogleTag, type GptSlot } from './gpt'
@@ -32,7 +31,7 @@ export interface BlockResult {
 
 export interface AdTargeting {
   page: Record<string, string>
-  slot: (path: string) => Record<string, string>
+  slot: (path: string, cascading?: boolean) => Record<string, string>
   cascade?: (path: string) => string[] | null
 }
 
@@ -86,12 +85,6 @@ function defineSlot(googletag: GoogleTag, block: PublicBlock, path: string, devi
   return slot
 }
 
-/** As keys do slot: `groone_try` só vai nos blocos que entram no laço da Cascata. */
-function blockTargeting(block: PublicBlock, targeting: Record<string, string>): Record<string, string> {
-  if (CASCADE_KINDS.includes(block.kind)) return targeting
-  return Object.fromEntries(Object.entries(targeting).filter(([key]) => key !== TRY_KEY))
-}
-
 /** Manda os key-values da página para o Avant, como a g-tag (`/api/admanager/keyvalue`). */
 function reportKeyValues(deps: AdsDeps, values: Record<string, string>, network: string | null): void {
   if (!network) return
@@ -134,7 +127,7 @@ export function startAds(config: PublicAdTag, deps: AdsDeps): AdsRun {
         const path = blockPath(block, deps.device) as string
         const slot = defineSlot(googletag, block, path, deps.device)
         if (!slot) continue
-        const slotTargeting = blockTargeting(block, extra?.slot(path) ?? {})
+        const slotTargeting = extra?.slot(path, CASCADE_KINDS.includes(block.kind)) ?? {}
         if (Object.keys(slotTargeting).length > 0) slot.setConfig({ targeting: slotTargeting })
         slot.addService(googletag.pubads())
         const found = { block, slot, container }

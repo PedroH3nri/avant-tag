@@ -22,7 +22,7 @@ function fakeGoogletag() {
     removeEventListener: () => undefined,
     refresh,
   }
-  /** Cria um slot falso que guarda o último targeting. */
+  /** Cria um slot falso que junta o targeting por key, como o GPT: null apaga a key. */
   const slot = (): FakeSlot => {
     const created: FakeSlot = {
       targeting: {},
@@ -30,7 +30,15 @@ function fakeGoogletag() {
       addService: () => created,
       setConfig: (config: Record<string, unknown>) => {
         created.configs.push(config)
-        if (config.targeting) created.targeting = config.targeting as Record<string, string>
+        if (config.targeting === null) created.targeting = {}
+        else if (config.targeting) {
+          const merged: Record<string, string> = { ...created.targeting }
+          for (const [key, value] of Object.entries(config.targeting as Record<string, string | null>)) {
+            if (value === null) delete merged[key]
+            else merged[key] = value
+          }
+          created.targeting = merged
+        }
       },
       getSlotElementId: () => '',
     }
@@ -127,7 +135,8 @@ describe('tryTargeting', () => {
   it('leva o degrau e a tentativa, e a 4ª sai sem groone_prices', () => {
     expect(tryTargeting(LADDER, 1)).toEqual({ groone_prices: '1.22', groone_try: '1' })
     expect(tryTargeting(LADDER, 3)).toEqual({ groone_prices: '1.05', groone_try: '3' })
-    expect(tryTargeting(LADDER, 4)).toEqual({ groone_try: '4' })
+    expect(tryTargeting(LADDER, 4)).toEqual({ groone_prices: null, groone_try: '4' })
+    expect(tryTargeting(['1.22'], 2)).toEqual({ groone_prices: null, groone_try: '2' })
     expect(CASCADE_KINDS).toEqual(['anchor', 'fixed'])
   })
 })
@@ -161,6 +170,7 @@ describe('laço da Cascata', () => {
     const slot = fake.slots[0] as FakeSlot
     for (let count = 0; count < 3; count += 1) fake.emit('slotRenderEnded', { slot, isEmpty: true })
     expect(slot.targeting).toEqual({ groone_try: '4' })
+    expect(slot.configs[slot.configs.length - 1]).toEqual({ targeting: { groone_prices: null, groone_try: '4' } })
     expect(fake.refresh).toHaveBeenCalledTimes(3)
   })
 
@@ -234,7 +244,7 @@ describe('laço da Cascata', () => {
       block({ kind: 'content', unit_type: 'Content1', desktop: path, selector: 'article p' }),
     ])
     const slot = fake.slots[0] as FakeSlot
-    expect(slot.targeting).not.toHaveProperty('groone_try')
+    expect(slot.targeting).toEqual({})
     fake.emit('slotRenderEnded', { slot, isEmpty: true })
     expect(fake.refresh).not.toHaveBeenCalled()
     expect(ads.results()).toEqual([{ type: 'Content1', state: 'empty' }])
