@@ -60,6 +60,7 @@ export interface PublicAdTag {
 export interface PriceFloorsResponse {
   control_percent: number | null
   floors: Record<string, string>
+  cascades: Record<string, string[]>
 }
 
 export interface PublicTagResponse {

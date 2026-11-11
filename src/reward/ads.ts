@@ -3,11 +3,21 @@
  * ad units na ordem e avisa quando a pessoa ganhou o prêmio, fechou ou não houve anúncio.
  */
 
+import { safely } from '../core/safely'
+import { GROUP_KEY } from '../price-rules'
+import { startCascade, tryTargeting, type Cascade } from '../ads/cascade'
+import type { GptSlot } from '../ads/gpt'
+
 const GPT_SOURCE = 'https://securepubads.g.doubleclick.net/tag/js/gpt.js'
 const READY_TIMEOUT_MS = 10_000
 
-export interface RewardedSlot {
-  addService(service: unknown): RewardedSlot
+export type RewardedSlot = GptSlot
+
+export type LadderOfPath = (path: string) => string[] | null
+
+export interface RewardCascade {
+  group: string
+  ladderOfPath: LadderOfPath
 }
 
 interface SlotEvent {
@@ -20,7 +30,11 @@ export interface GoogleTag {
   cmd: Array<() => void> | { push(command: () => void): void }
   enums: { OutOfPageFormat: { REWARDED: number } }
   defineOutOfPageSlot(path: string, format: number): RewardedSlot | null
-  pubads(): { addEventListener(name: string, listener: (event: SlotEvent) => void): void }
+  pubads(): {
+    addEventListener(name: string, listener: (event: SlotEvent) => void): void
+    refresh(slots: RewardedSlot[]): void
+  }
+  setConfig(config: Record<string, unknown>): void
   enableServices(): void
   display(slot: RewardedSlot): void
   destroySlots(slots?: RewardedSlot[]): boolean
@@ -43,13 +57,14 @@ export function loadGoogleTag(target: Window = window): void {
 }
 
 /** Mostra o anúncio premiado de um dos caminhos e responde como terminou; sem anúncio, `unavailable`. */
-export function showRewardedAd(paths: string[], target: Window = window): Promise<AdOutcome> {
+export function showRewardedAd(paths: string[], target: Window = window, rewardCascade?: RewardCascade): Promise<AdOutcome> {
   return new Promise((resolve) => {
     if (paths.length === 0) return resolve('unavailable')
     loadGoogleTag(target)
     let finished = false
     let current: RewardedSlot | null = null
     let granted = false
+    let cascade: Cascade | null = null
     const timer = target.setTimeout(() => finish('unavailable'), READY_TIMEOUT_MS)
 
     /** Encerra uma vez só, limpa o slot e devolve o resultado. */
@@ -57,6 +72,7 @@ export function showRewardedAd(paths: string[], target: Window = window): Promis
       if (finished) return
       finished = true
       target.clearTimeout(timer)
+      cascade?.done()
       if (current) (target as RewardWindow).googletag?.destroySlots?.([current])
       resolve(outcome)
     }
@@ -69,7 +85,21 @@ export function showRewardedAd(paths: string[], target: Window = window): Promis
       if (!current) return tryNext(googletag, rest)
       current.addService(googletag.pubads())
       pending = rest
+      cascade = null
+      const ladder = rewardCascade?.ladderOfPath(path)
+      const slot = current
+      if (ladder && safely(() => slot.setConfig({ targeting: tryTargeting(ladder, 1) })) !== null) {
+        cascade = startCascade({ target, googletag, slot, ladder, onExpire: () => moveOn(googletag, slot) })
+      }
       googletag.display(current)
+    }
+
+    /** Passa ao próximo caminho: o slot atual acabou a escada ou o tempo, não é um rebid. */
+    function moveOn(googletag: GoogleTag, slot: RewardedSlot): void {
+      if (finished || slot !== current) return
+      googletag.destroySlots([slot])
+      current = null
+      tryNext(googletag, pending)
     }
 
     let pending: string[] = []
@@ -80,13 +110,13 @@ export function showRewardedAd(paths: string[], target: Window = window): Promis
       ads.addEventListener('rewardedSlotReady', (event) => {
         if (event.slot !== current) return
         target.clearTimeout(timer)
+        cascade?.done()
         event.makeRewardedVisible?.()
       })
       ads.addEventListener('slotRenderEnded', (event) => {
         if (event.slot !== current || !event.isEmpty) return
-        googletag.destroySlots([event.slot])
-        current = null
-        tryNext(googletag, pending)
+        if (cascade?.onEmpty()) return
+        moveOn(googletag, event.slot)
       })
       ads.addEventListener('rewardedSlotGranted', (event) => {
         if (event.slot === current) granted = true
@@ -94,6 +124,7 @@ export function showRewardedAd(paths: string[], target: Window = window): Promis
       ads.addEventListener('rewardedSlotClosed', (event) => {
         if (event.slot === current) finish(granted ? 'granted' : 'closed')
       })
+      if (rewardCascade) safely(() => googletag.setConfig({ targeting: { [GROUP_KEY]: rewardCascade.group } }))
       googletag.enableServices()
       tryNext(googletag, paths)
     })

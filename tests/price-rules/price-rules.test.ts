@@ -67,7 +67,7 @@ describe('startPriceRules', () => {
   it('dá os floors ao grupo da regra e nada ao controle', async () => {
     vi.stubGlobal('fetch', answer({ control_percent: 0, floors: { Content3_Mobile: '1.01' } }))
     const run = await startPriceRules(window, ORIGIN, 'tg_abcd1234', HASH, 'visitante')
-    expect(run).toEqual({ group: 'regra', floors: { Content3_Mobile: '1.01' } })
+    expect(run).toEqual({ group: 'regra', floors: { Content3_Mobile: '1.01' }, cascades: {} })
     const keys = adTargeting(run as NonNullable<typeof run>)
     expect(keys.page).toEqual({ groone_group: 'regra' })
     expect(keys.slot('/2100/blog.com/Blog_Content3_Mobile_20261028')).toEqual({ groone_prices: '1.01' })
@@ -75,7 +75,7 @@ describe('startPriceRules', () => {
 
     vi.stubGlobal('fetch', answer({ control_percent: 100, floors: { Content3_Mobile: '1.01' } }))
     const control = await startPriceRules(window, ORIGIN, 'tg_abcd1234', HASH, 'visitante')
-    expect(control).toEqual({ group: 'controle', floors: {} })
+    expect(control).toEqual({ group: 'controle', floors: {}, cascades: {} })
 
     vi.stubGlobal('fetch', answer({ control_percent: null, floors: {} }))
     await expect(startPriceRules(window, ORIGIN, 'tg_abcd1234', HASH, 'visitante')).resolves.toBeNull()

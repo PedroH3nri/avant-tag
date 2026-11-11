@@ -16,6 +16,7 @@ export function startRefresh(
   slot: GptSlot,
   element: Element,
   seconds: number,
+  beforeRefresh?: () => void,
 ): () => void {
   let visible = false
   let elapsed = 0
@@ -36,7 +37,10 @@ export function startRefresh(
     if (elapsed < seconds * 1000) return
     elapsed = 0
     count += 1
-    googletag.cmd.push(() => googletag.pubads().refresh([slot]))
+    googletag.cmd.push(() => {
+      beforeRefresh?.()
+      googletag.pubads().refresh([slot])
+    })
     if (count >= MAX_REFRESHES) stop()
   }, TICK_MS)
 
