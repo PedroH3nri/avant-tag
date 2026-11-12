@@ -9,3 +9,12 @@ updates:
       dependencias:
         patterns: ["*"]
         update-types: ["minor", "patch"]
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: pre-develop
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
