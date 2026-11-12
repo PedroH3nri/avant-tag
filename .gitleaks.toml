@@ -9,4 +9,4 @@ useDefault = true
 [[allowlists]]
 description = "Senhas, tokens e chaves fixas dos testes (fixtures, não são segredos)"
 targetRules = ["generic-api-key"]
-paths = ['''(^|/)tests/''']
+paths = ['''^tests/''']
