@@ -1,0 +1,12 @@
+# Configuração do gitleaks (avant-infra#87): as regras padrão, menos as senhas e chaves fixas
+# dos testes. Só a regra genérica é liberada, e só em tests/: um segredo de verdade (chave da
+# AWS, do Google, do Resend, chave privada) continua sendo achado em qualquer pasta.
+title = "Groone Avant"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Senhas, tokens e chaves fixas dos testes (fixtures, não são segredos)"
+targetRules = ["generic-api-key"]
+paths = ['''(^|/)tests/''']
