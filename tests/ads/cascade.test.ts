@@ -81,12 +81,12 @@ function block(changes: Partial<PublicBlock>): PublicBlock {
 }
 
 /** A tag com os blocos pedidos. */
-function tagWith(blocks: PublicBlock[]): PublicAdTag {
+function tagWith(blocks: PublicBlock[], lazyLoad = false): PublicAdTag {
   return {
     key: 'tg_abcd1234',
     version: 1,
     domain: 'localhost',
-    lazy_load: false,
+    lazy_load: lazyLoad,
     analytics_id: null,
     mgid: { tag_id: null, smart_widget: null, back_button: null, sidebar: null },
     reward: false,
@@ -97,7 +97,7 @@ function tagWith(blocks: PublicBlock[]): PublicAdTag {
 }
 
 /** Liga os anúncios com as regras de preço da escada, e devolve o falso e a corrida. */
-async function setup(blocks: PublicBlock[], group: 'regra' | 'controle' = 'regra') {
+async function setup(blocks: PublicBlock[], group: 'regra' | 'controle' = 'regra', lazyLoad = false) {
   const fake = fakeGoogletag()
   ;(window as Window & { googletag?: GoogleTag }).googletag = fake.googletag
   const run: PriceRulesRun = {
@@ -106,7 +106,7 @@ async function setup(blocks: PublicBlock[], group: 'regra' | 'controle' = 'regra
     cascades: group === 'regra' ? { Anchor_Desktop: LADDER, Fixed_Desktop: LADDER, Content1_Desktop: LADDER } : {},
   }
   const onEmpty = vi.fn()
-  const ads = startAds(tagWith(blocks), {
+  const ads = startAds(tagWith(blocks, lazyLoad), {
     target: window,
     origin: 'https://avant.groone.com',
     device: 'desktop',
@@ -137,7 +137,7 @@ describe('tryTargeting', () => {
     expect(tryTargeting(LADDER, 3)).toEqual({ groone_prices: '1.05', groone_try: '3' })
     expect(tryTargeting(LADDER, 4)).toEqual({ groone_prices: null, groone_try: '4' })
     expect(tryTargeting(['1.22'], 2)).toEqual({ groone_prices: null, groone_try: '2' })
-    expect(CASCADE_KINDS).toEqual(['anchor', 'fixed'])
+    expect(CASCADE_KINDS).toEqual(['anchor', 'fixed', 'content'])
   })
 })
 
@@ -148,7 +148,7 @@ describe('startCascade', () => {
       throw new Error('GPT')
     })
     const slot = fake.googletag.defineOutOfPageSlot(ANCHOR_PATH, 3) as GptSlot
-    const cascade = startCascade({ target: window, googletag: fake.googletag, slot, ladder: LADDER })
+    const cascade = startCascade({ googletag: fake.googletag, slot, ladder: LADDER })
     expect(cascade.onEmpty()).toBe(false)
   })
 })
@@ -198,16 +198,27 @@ describe('laço da Cascata', () => {
     expect(onEmpty).toHaveBeenCalledTimes(1)
   })
 
-  it('o GPT que nunca avisa: o teto encerra o laço e grava empty uma vez só', async () => {
+  it('o teto não chama onEmpty com uma tentativa no ar; só o vazio dela encerra', async () => {
     const { fake, ads, onEmpty } = await setup([block({})])
     const slot = fake.slots[0] as GptSlot
     fake.emit('slotRenderEnded', { slot, isEmpty: true })
-    await vi.advanceTimersByTimeAsync(3000)
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(ads.results()).toEqual([])
+    expect(onEmpty).not.toHaveBeenCalled()
+    fake.emit('slotRenderEnded', { slot, isEmpty: true })
     expect(ads.results()).toEqual([{ type: 'Anchor', state: 'empty' }])
     expect(onEmpty).toHaveBeenCalledTimes(1)
-    fake.emit('slotRenderEnded', { slot, isEmpty: true })
-    expect(onEmpty).toHaveBeenCalledTimes(1)
     expect(fake.refresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('a tentativa no ar depois do teto ainda pode encher', async () => {
+    const { fake, ads, onEmpty } = await setup([block({})])
+    const slot = fake.slots[0] as GptSlot
+    fake.emit('slotRenderEnded', { slot, isEmpty: true })
+    await vi.advanceTimersByTimeAsync(5000)
+    fake.emit('slotRenderEnded', { slot, isEmpty: false })
+    expect(ads.results()).toEqual([{ type: 'Anchor', state: 'rendered' }])
+    expect(onEmpty).not.toHaveBeenCalled()
   })
 
   it('o teto não grava nada quando a tentativa encheu', async () => {
@@ -238,41 +249,68 @@ describe('laço da Cascata', () => {
     expect(fake.refresh).toHaveBeenCalledWith([slot])
   })
 
-  it('conteúdo nunca entra no laço', async () => {
+  it('conteúdo entra no laço e o artigo MGID só vem depois da escada inteira', async () => {
     const path = '/2100/blog.com/Blog_Content1_Desktop_20261028'
     const { fake, ads, onEmpty } = await setup([
       block({ kind: 'content', unit_type: 'Content1', desktop: path, selector: 'article p' }),
     ])
     const slot = fake.slots[0] as FakeSlot
-    expect(slot.targeting).toEqual({})
+    expect(slot.targeting).toEqual({ groone_prices: '1.22', groone_try: '1' })
+    for (let count = 0; count < 3; count += 1) {
+      fake.emit('slotRenderEnded', { slot, isEmpty: true })
+      expect(onEmpty).not.toHaveBeenCalled()
+    }
+    expect(slot.targeting).toEqual({ groone_try: '4' })
+    expect(fake.refresh).toHaveBeenCalledTimes(3)
     fake.emit('slotRenderEnded', { slot, isEmpty: true })
-    expect(fake.refresh).not.toHaveBeenCalled()
     expect(ads.results()).toEqual([{ type: 'Content1', state: 'empty' }])
     expect(onEmpty).toHaveBeenCalledTimes(1)
   })
 
-  it('intersticial ainda não entra no laço', async () => {
+  it('conteúdo sob demanda: o teto conta do 1º pedido, não da montagem', async () => {
+    const path = '/2100/blog.com/Blog_Content1_Desktop_20261028'
+    const { fake } = await setup(
+      [block({ kind: 'content', unit_type: 'Content1', desktop: path, selector: 'article p' })],
+      'regra',
+      true,
+    )
+    const slot = fake.slots[0] as FakeSlot
+    await vi.advanceTimersByTimeAsync(20_000)
+    fake.emit('slotRequested', { slot })
+    fake.emit('slotRenderEnded', { slot, isEmpty: true })
+    expect(fake.refresh).toHaveBeenCalledWith([slot])
+    expect(slot.targeting).toEqual({ groone_prices: '1.13', groone_try: '2' })
+    fake.emit('slotRequested', { slot })
+    await vi.advanceTimersByTimeAsync(3001)
+    fake.emit('slotRenderEnded', { slot, isEmpty: true })
+    expect(fake.refresh).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    ['Cascata', { floors: {}, cascades: { Interstitial_Desktop: LADDER } }, {}],
+    ['Automática', { floors: { Interstitial_Desktop: '0.90' }, cascades: {} }, { groone_prices: '0.90' }],
+  ])('intersticial na %s ainda não entra no laço e leva só as keys certas', async (_model, rules, keys) => {
     const path = '/2100/blog.com/Blog_Interstitial_Desktop_20261028'
     const fake = fakeGoogletag()
     ;(window as Window & { googletag?: GoogleTag }).googletag = fake.googletag
+    const run: PriceRulesRun = { group: 'regra', ...rules }
     const ads = startAds(tagWith([block({ kind: 'interstitial', unit_type: 'Interstitial', desktop: path })]), {
       target: window,
       origin: 'https://avant.groone.com',
       device: 'desktop',
       language: 'pt',
-      targeting: Promise.resolve({
-        page: {},
-        slot: () => ({}),
-        cascade: () => LADDER,
-      }),
+      targeting: Promise.resolve(adTargeting(run)),
     })
     await vi.advanceTimersByTimeAsync(500)
-    fake.emit('slotRenderEnded', { slot: fake.slots[0] as GptSlot, isEmpty: true })
+    const slot = fake.slots[0] as FakeSlot
+    expect(slot.targeting).toEqual(keys)
+    expect(slot.targeting).not.toHaveProperty('groone_try')
+    fake.emit('slotRenderEnded', { slot, isEmpty: true })
     expect(fake.refresh).not.toHaveBeenCalled()
     expect(ads.results()).toEqual([{ type: 'Interstitial', state: 'empty' }])
   })
 
-  it('âncora que encheu na 2ª: o refresh por tempo só começa depois e volta ao 1º degrau', async () => {
+  it('âncora que encheu na 2ª: o refresh por tempo só começa depois e recomeça a escada inteira', async () => {
     let report: (entries: Array<Partial<IntersectionObserverEntry>>) => void = () => undefined
     class FakeObserver {
       /** Guarda quem avisa a visibilidade. */
@@ -297,6 +335,15 @@ describe('laço da Cascata', () => {
     expect(fake.refresh).toHaveBeenCalledTimes(2)
     expect(slot.targeting).toEqual({ groone_prices: '1.22', groone_try: '1' })
     expect(ads.results()).toEqual([{ type: 'Anchor', state: 'rendered' }])
+    fake.emit('slotRenderEnded', { slot, isEmpty: true })
+    expect(fake.refresh).toHaveBeenCalledTimes(3)
+    expect(slot.targeting).toEqual({ groone_prices: '1.13', groone_try: '2' })
+    fake.emit('slotRenderEnded', { slot, isEmpty: true })
+    fake.emit('slotRenderEnded', { slot, isEmpty: true })
+    expect(slot.targeting).toEqual({ groone_try: '4' })
+    fake.emit('slotRenderEnded', { slot, isEmpty: true })
+    expect(fake.refresh).toHaveBeenCalledTimes(5)
+    expect(ads.results()).toEqual([{ type: 'Anchor', state: 'empty' }])
   })
 })
 

@@ -250,10 +250,25 @@ describe('gatilho', () => {
   })
 })
 
+type Listeners = Map<string, Array<(event: object) => void>>
+
+/** Junta o ouvinte na lista do evento, como o GPT, que guarda todos e não troca o anterior. */
+function listen(listeners: Listeners, name: string, listener: (event: object) => void): void {
+  listeners.set(name, [...(listeners.get(name) ?? []), listener])
+}
+
+/** Dispara o evento para todos os ouvintes dele. */
+function emitter(listeners: Listeners) {
+  return {
+    get: (name: string) => (event: object) => (listeners.get(name) ?? []).forEach((listener) => listener(event)),
+    count: (name: string) => (listeners.get(name) ?? []).length,
+  }
+}
+
 describe('anúncio premiado', () => {
   /** Um googletag falso que guarda os ouvintes e deixa o teste disparar os eventos. */
   function fakeGoogleTag() {
-    const listeners = new Map<string, (event: object) => void>()
+    const listeners: Listeners = new Map()
     const slots: object[] = []
     const googletag = {
       cmd: { push: (command: () => void) => command() },
@@ -263,13 +278,13 @@ describe('anúncio premiado', () => {
         slots.push(slot)
         return slot
       },
-      pubads: () => ({ addEventListener: (name: string, listener: (event: object) => void) => listeners.set(name, listener) }),
+      pubads: () => ({ addEventListener: (name: string, listener: (event: object) => void) => listen(listeners, name, listener) }),
       enableServices: () => undefined,
       display: () => undefined,
       destroySlots: () => true,
     }
     ;(window as Window & { googletag?: unknown }).googletag = googletag
-    return { listeners, slots }
+    return { listeners: emitter(listeners), slots }
   }
 
   it('sem ad unit responde unavailable sem carregar nada', async () => {
@@ -279,11 +294,11 @@ describe('anúncio premiado', () => {
   it('tenta o próximo ad unit quando vem vazio e avisa o prêmio', async () => {
     const { listeners, slots } = fakeGoogleTag()
     const result = showRewardedAd(['/1/a', '/1/b'])
-    listeners.get('slotRenderEnded')?.({ slot: slots[0], isEmpty: true })
+    listeners.get('slotRenderEnded')({ slot: slots[0], isEmpty: true })
     const visible = vi.fn()
-    listeners.get('rewardedSlotReady')?.({ slot: slots[1], makeRewardedVisible: visible })
-    listeners.get('rewardedSlotGranted')?.({ slot: slots[1] })
-    listeners.get('rewardedSlotClosed')?.({ slot: slots[1] })
+    listeners.get('rewardedSlotReady')({ slot: slots[1], makeRewardedVisible: visible })
+    listeners.get('rewardedSlotGranted')({ slot: slots[1] })
+    listeners.get('rewardedSlotClosed')({ slot: slots[1] })
     expect(visible).toHaveBeenCalled()
     expect(await result).toBe('granted')
     delete (window as Window & { googletag?: unknown }).googletag
@@ -292,7 +307,7 @@ describe('anúncio premiado', () => {
   it('responde closed quando a pessoa fecha antes do prêmio', async () => {
     const { listeners, slots } = fakeGoogleTag()
     const result = showRewardedAd(['/1/a'])
-    listeners.get('rewardedSlotClosed')?.({ slot: slots[0] })
+    listeners.get('rewardedSlotClosed')({ slot: slots[0] })
     expect(await result).toBe('closed')
     delete (window as Window & { googletag?: unknown }).googletag
   })
@@ -305,7 +320,7 @@ describe('Cascata no anúncio premiado', () => {
 
   /** Um googletag falso com slot que junta o targeting por key, como o GPT: null apaga a key. */
   function cascadeGoogleTag() {
-    const listeners = new Map<string, (event: object) => void>()
+    const listeners: Listeners = new Map()
     type FakeSlot = { path: string; targeting: Record<string, string>; addService: () => FakeSlot; setConfig: (config: { targeting: Record<string, string | null> }) => void }
     const slots: FakeSlot[] = []
     const refresh = vi.fn()
@@ -333,7 +348,7 @@ describe('Cascata no anúncio premiado', () => {
       enums: { OutOfPageFormat: { REWARDED: 4 } },
       defineOutOfPageSlot,
       pubads: () => ({
-        addEventListener: (name: string, listener: (event: object) => void) => listeners.set(name, listener),
+        addEventListener: (name: string, listener: (event: object) => void) => listen(listeners, name, listener),
         refresh,
       }),
       setConfig: (config: Record<string, unknown>) => pageConfigs.push(config),
@@ -342,8 +357,8 @@ describe('Cascata no anúncio premiado', () => {
       destroySlots,
     }
     /** Dispara o vazio do slot. */
-    const empty = (slot: object) => listeners.get('slotRenderEnded')?.({ slot, isEmpty: true })
-    return { listeners, slots, refresh, destroySlots, defineOutOfPageSlot, empty, pageConfigs, slotFailure }
+    const empty = (slot: object) => emitter(listeners).get('slotRenderEnded')({ slot, isEmpty: true })
+    return { listeners: emitter(listeners), slots, refresh, destroySlots, defineOutOfPageSlot, empty, pageConfigs, slotFailure }
   }
 
   const ladderOf = { group: 'regra', ladderOfPath: (path: string): string[] | null => (path === PATH_A ? LADDER : null) }
@@ -381,13 +396,42 @@ describe('Cascata no anúncio premiado', () => {
     expect(refresh).toHaveBeenCalledTimes(3)
   })
 
-  it('passa ao próximo caminho quando a escada passa de 3000 ms', () => {
+  it('depois de 3000 ms não pede de novo: o vazio da tentativa no ar passa ao próximo caminho', () => {
     vi.useFakeTimers()
-    const { slots, defineOutOfPageSlot, empty } = cascadeGoogleTag()
+    const { slots, refresh, defineOutOfPageSlot, empty } = cascadeGoogleTag()
     void showRewardedAd([PATH_A, PATH_B], window, ladderOf)
     empty(slots[0] as object)
     vi.advanceTimersByTime(3001)
+    expect(defineOutOfPageSlot).toHaveBeenCalledTimes(1)
+    empty(slots[0] as object)
+    expect(refresh).toHaveBeenCalledTimes(1)
     expect(defineOutOfPageSlot).toHaveBeenCalledTimes(2)
+  })
+
+  it('o teto conta do 1º slotRequested, não da montagem', () => {
+    vi.useFakeTimers()
+    const { listeners, slots, refresh, empty } = cascadeGoogleTag()
+    void showRewardedAd([PATH_A, PATH_B], window, ladderOf)
+    vi.advanceTimersByTime(5000)
+    listeners.get('slotRequested')({ slot: slots[0] })
+    empty(slots[0] as object)
+    expect(refresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('o 2º anúncio na página convive com os ouvintes do 1º, que o GPT mantém', async () => {
+    const { listeners, slots, empty, refresh } = cascadeGoogleTag()
+    const first = showRewardedAd([PATH_A], window, ladderOf)
+    listeners.get('rewardedSlotClosed')({ slot: slots[0] })
+    expect(await first).toBe('closed')
+    const second = showRewardedAd([PATH_A], window, ladderOf)
+    expect(listeners.count('slotRenderEnded')).toBe(2)
+    empty(slots[1] as object)
+    expect(refresh).toHaveBeenCalledTimes(1)
+    expect(refresh).toHaveBeenCalledWith([slots[1]])
+    listeners.get('rewardedSlotReady')({ slot: slots[1], makeRewardedVisible: vi.fn() })
+    listeners.get('rewardedSlotGranted')({ slot: slots[1] })
+    listeners.get('rewardedSlotClosed')({ slot: slots[1] })
+    expect(await second).toBe('granted')
   })
 
   it('sem escada para o caminho, o vazio segue para o próximo como hoje', () => {
@@ -403,9 +447,9 @@ describe('Cascata no anúncio premiado', () => {
     const { listeners, slots, empty } = cascadeGoogleTag()
     const result = showRewardedAd([PATH_A], window, ladderOf)
     empty(slots[0] as object)
-    listeners.get('rewardedSlotReady')?.({ slot: slots[0], makeRewardedVisible: vi.fn() })
-    listeners.get('rewardedSlotGranted')?.({ slot: slots[0] })
-    listeners.get('rewardedSlotClosed')?.({ slot: slots[0] })
+    listeners.get('rewardedSlotReady')({ slot: slots[0], makeRewardedVisible: vi.fn() })
+    listeners.get('rewardedSlotGranted')({ slot: slots[0] })
+    listeners.get('rewardedSlotClosed')({ slot: slots[0] })
     expect(await result).toBe('granted')
   })
 
@@ -476,19 +520,19 @@ describe('Cascata no anúncio premiado', () => {
       expect(defineOutOfPageSlot).toHaveBeenCalledTimes(2)
     })
 
-    it('evento tardio do slot destruído depois dos 3000 ms é ignorado', async () => {
+    it('a tentativa no ar depois dos 3000 ms ainda pode entregar o prêmio', async () => {
       vi.useFakeTimers()
       const { listeners, slots, empty, refresh } = cascadeGoogleTag()
       const result = showRewardedAd([PATH_A], window, ladderOf)
       empty(slots[0] as object)
       vi.advanceTimersByTime(3001)
       const visible = vi.fn()
-      listeners.get('rewardedSlotReady')?.({ slot: slots[0], makeRewardedVisible: visible })
-      listeners.get('rewardedSlotGranted')?.({ slot: slots[0] })
-      empty(slots[0] as object)
-      expect(visible).not.toHaveBeenCalled()
+      listeners.get('rewardedSlotReady')({ slot: slots[0], makeRewardedVisible: visible })
+      listeners.get('rewardedSlotGranted')({ slot: slots[0] })
+      listeners.get('rewardedSlotClosed')({ slot: slots[0] })
+      expect(visible).toHaveBeenCalled()
       expect(refresh).toHaveBeenCalledTimes(1)
-      expect(await result).toBe('unavailable')
+      expect(await result).toBe('granted')
     })
 
     it('o READY_TIMEOUT_MS ainda responde unavailable com a escada ativa', async () => {

@@ -89,7 +89,7 @@ export function showRewardedAd(paths: string[], target: Window = window, rewardC
       const ladder = rewardCascade?.ladderOfPath(path)
       const slot = current
       if (ladder && safely(() => slot.setConfig({ targeting: tryTargeting(ladder, 1) })) !== null) {
-        cascade = startCascade({ target, googletag, slot, ladder, onExpire: () => moveOn(googletag, slot) })
+        cascade = startCascade({ googletag, slot, ladder })
       }
       googletag.display(current)
     }
@@ -112,6 +112,9 @@ export function showRewardedAd(paths: string[], target: Window = window, rewardC
         target.clearTimeout(timer)
         cascade?.done()
         event.makeRewardedVisible?.()
+      })
+      ads.addEventListener('slotRequested', (event) => {
+        if (event.slot === current) cascade?.requested()
       })
       ads.addEventListener('slotRenderEnded', (event) => {
         if (event.slot !== current || !event.isEmpty) return

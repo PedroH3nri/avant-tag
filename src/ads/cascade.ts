@@ -1,7 +1,7 @@
 /**
  * O laço de tentativas da Cascata (decisão 15 do avant-core): quando o slot volta vazio, a tag
  * pede o MESMO slot de novo com o próximo degrau da escada e `groone_try`, em até 4 tentativas
- * ou 3000 ms desde a 1ª.
+ * ou 3000 ms desde o 1º pedido.
  */
 
 import { safely } from '../core/safely'
@@ -9,20 +9,20 @@ import type { BlockKind } from '../core/types'
 import { CASCADE_MAX_MS, CASCADE_TRIES, PRICE_KEY, TRY_KEY } from '../price-rules'
 import type { GptSlot } from './gpt'
 
-export const CASCADE_KINDS: readonly BlockKind[] = ['anchor', 'fixed']
+export const CASCADE_KINDS: readonly BlockKind[] = ['anchor', 'fixed', 'content']
 
 export const REWARD_CASCADE_ENABLED = false
 
 export interface CascadeDeps {
-  target: Window
   googletag: { pubads(): { refresh(slots: GptSlot[]): void } }
   slot: GptSlot
   ladder: string[]
-  onExpire?: () => void
 }
 
 export interface Cascade {
   onEmpty(): boolean
+  requested(): void
+  restart(): void
   done(): void
 }
 
@@ -32,20 +32,16 @@ export function tryTargeting(ladder: string[], attempt: number): Record<string, 
   return { [PRICE_KEY]: price ?? null, [TRY_KEY]: String(attempt) }
 }
 
-/** Começa o laço do slot; o teto de 3000 ms conta da montagem, logo antes do 1º pedido, sem esperar o `slotRequested`. */
+/**
+ * Começa o laço do slot; o teto conta do 1º `slotRequested` (sem ele, da montagem) e só impede um
+ * novo pedido: a tentativa no ar termina, e só o vazio dela encerra o bloco.
+ */
 export function startCascade(deps: CascadeDeps): Cascade {
-  const { target, googletag, slot, ladder } = deps
-  const startedAt = Date.now()
+  const { googletag, slot, ladder } = deps
+  let startedAt = Date.now()
+  let requestSeen = false
   let attempt = 1
   let finished = false
-  let timer: number | null = null
-
-  /** Encerra o laço e desliga o relógio do teto. */
-  function finish(): void {
-    finished = true
-    if (timer !== null) target.clearTimeout(timer)
-    timer = null
-  }
 
   /** Pede o slot de novo com a próxima tentativa. */
   function rebid(): void {
@@ -59,18 +55,25 @@ export function startCascade(deps: CascadeDeps): Cascade {
       if (finished) return false
       const expired = Date.now() - startedAt > CASCADE_MAX_MS
       if (expired || attempt >= CASCADE_TRIES || safely(rebid) === null) {
-        finish()
+        finished = true
         return false
-      }
-      if (timer === null) {
-        timer = target.setTimeout(() => {
-          if (finished) return
-          finish()
-          deps.onExpire?.()
-        }, Math.max(CASCADE_MAX_MS - (Date.now() - startedAt), 0))
       }
       return true
     },
-    done: finish,
+    requested: () => {
+      if (requestSeen || finished) return
+      requestSeen = true
+      startedAt = Date.now()
+    },
+    restart: () => {
+      attempt = 1
+      finished = false
+      requestSeen = false
+      startedAt = Date.now()
+      slot.setConfig({ targeting: tryTargeting(ladder, 1) })
+    },
+    done: () => {
+      finished = true
+    },
   }
 }

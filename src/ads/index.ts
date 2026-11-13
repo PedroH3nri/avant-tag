@@ -7,7 +7,7 @@ import { sendBeacon } from '../core/beacon'
 import { blockAllowed } from '../core/paths'
 import { safely } from '../core/safely'
 import type { Device, PublicAdTag, PublicBlock } from '../core/types'
-import { CASCADE_KINDS, startCascade, tryTargeting, type Cascade } from './cascade'
+import { CASCADE_KINDS, startCascade, type Cascade } from './cascade'
 import { ensureGpt, gptReady, type GoogleTag, type GptSlot, type GptSlotEvent } from './gpt'
 import { addLabels, blockElementId, placeBlock } from './placement'
 import { startRefresh } from './refresh'
@@ -120,7 +120,7 @@ export function startAds(config: PublicAdTag, deps: AdsDeps): AdsRun {
       googletag.setConfig({ targeting, ...(config.lazy_load ? { lazyLoad: LAZY_LOAD } : {}) })
       const defined: Defined[] = []
       const refreshing = new Set<GptSlot>()
-      const cascades = new Map<GptSlot, { cascade: Cascade; ladder: string[] }>()
+      const cascades = new Map<GptSlot, Cascade>()
       const emptied = new Set<GptSlot>()
       for (const { block, container } of placed) {
         if (block.kind === 'content' && !container) continue
@@ -134,8 +134,7 @@ export function startAds(config: PublicAdTag, deps: AdsDeps): AdsRun {
         defined.push(found)
         const ladder = CASCADE_KINDS.includes(block.kind) ? extra?.cascade?.(path) : null
         if (ladder) {
-          const cascade = startCascade({ target, googletag, slot, ladder, onExpire: () => settleEmpty(found) })
-          cascades.set(slot, { cascade, ladder })
+          cascades.set(slot, startCascade({ googletag, slot, ladder }))
         }
       }
       /** Grava o bloco como vazio e avisa uma vez só, mesmo que o fim venha por dois caminhos. */
@@ -151,11 +150,11 @@ export function startAds(config: PublicAdTag, deps: AdsDeps): AdsRun {
         if (!found) return
         const cascade = cascades.get(found.slot)
         if (event.isEmpty) {
-          if (cascade?.cascade.onEmpty()) return
+          if (cascade?.onEmpty()) return
           settleEmpty(found)
           return
         }
-        cascade?.cascade.done()
+        cascade?.done()
         emptied.delete(found.slot)
         results.set(found.block.unit_type, 'rendered')
         if (found.block.kind === 'content' && found.container && !found.container.querySelector('.avt-label')) {
@@ -164,12 +163,11 @@ export function startAds(config: PublicAdTag, deps: AdsDeps): AdsRun {
         const element = page.getElementById(blockElementId(found.block))
         if (found.block.refresh_seconds && element && !refreshing.has(found.slot)) {
           refreshing.add(found.slot)
-          const beforeRefresh = cascade
-            ? () => safely(() => found.slot.setConfig({ targeting: tryTargeting(cascade.ladder, 1) }))
-            : undefined
+          const beforeRefresh = cascade ? () => safely(() => cascade.restart()) : undefined
           startRefresh(target, googletag, found.slot, element, found.block.refresh_seconds, beforeRefresh)
         }
       }
+      googletag.pubads().addEventListener('slotRequested', (event) => cascades.get(event.slot)?.requested())
       googletag.pubads().addEventListener('slotRenderEnded', onRendered)
       googletag.pubads().addEventListener('impressionViewable', () => markViewable())
       googletag.enableServices()
