@@ -1,0 +1,12 @@
+{
+  "name": "avant-teste-rebid",
+  "private": true,
+  "type": "module",
+  "description": "Teste manual do rebid da Cascata com o GPT de verdade (avant-tag#18). Fora do pnpm da tag.",
+  "scripts": {
+    "teste": "node rodar.mjs"
+  },
+  "devDependencies": {
+    "playwright": "1.49.1"
+  }
+}

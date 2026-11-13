@@ -1,7 +1,7 @@
 /**
  * O laço de tentativas da Cascata (decisão 15 do avant-core): quando o slot volta vazio, a tag
  * pede o MESMO slot de novo com o próximo degrau da escada e `groone_try`, em até 4 tentativas
- * ou 3000 ms desde a 1ª.
+ * ou 3000 ms desde o 1º pedido.
  */
 
 import { safely } from '../core/safely'
@@ -9,20 +9,30 @@ import type { BlockKind } from '../core/types'
 import { CASCADE_MAX_MS, CASCADE_TRIES, PRICE_KEY, TRY_KEY } from '../price-rules'
 import type { GptSlot } from './gpt'
 
-export const CASCADE_KINDS: readonly BlockKind[] = ['anchor', 'fixed']
+export const CASCADE_KINDS: readonly BlockKind[] = ['anchor', 'fixed', 'content']
 
-export const REWARD_CASCADE_ENABLED = false
+export const SINGLE_TRY_KINDS: readonly BlockKind[] = ['interstitial']
+
+export const LADDER_KINDS: readonly BlockKind[] = [...CASCADE_KINDS, ...SINGLE_TRY_KINDS]
+
+export const REWARD_CASCADE_ENABLED = true
+
+export const REWARD_REBID_ENABLED = false
+
+export const CASCADE_STALL_MS = 5000
 
 export interface CascadeDeps {
   target: Window
   googletag: { pubads(): { refresh(slots: GptSlot[]): void } }
   slot: GptSlot
   ladder: string[]
-  onExpire?: () => void
+  onStall?: () => void
 }
 
 export interface Cascade {
   onEmpty(): boolean
+  requested(): void
+  restart(): boolean
   done(): void
 }
 
@@ -32,43 +42,64 @@ export function tryTargeting(ladder: string[], attempt: number): Record<string, 
   return { [PRICE_KEY]: price ?? null, [TRY_KEY]: String(attempt) }
 }
 
-/** Começa o laço do slot; o teto de 3000 ms conta da montagem, logo antes do 1º pedido, sem esperar o `slotRequested`. */
+/**
+ * Começa o laço do slot; o teto conta do 1º `slotRequested` (sem ele, da montagem) e só impede um
+ * novo pedido. Pedido que saiu e ficou 5 s sem resposta encerra o laço e avisa `onStall`.
+ */
 export function startCascade(deps: CascadeDeps): Cascade {
   const { target, googletag, slot, ladder } = deps
-  const startedAt = Date.now()
+  let startedAt = Date.now()
+  let requestSeen = false
   let attempt = 1
   let finished = false
-  let timer: number | null = null
+  let stallTimer: number | null = null
 
-  /** Encerra o laço e desliga o relógio do teto. */
+  /** Desliga o relógio do pedido no ar. */
+  function clearStall(): void {
+    if (stallTimer !== null) target.clearTimeout(stallTimer)
+    stallTimer = null
+  }
+
+  /** Encerra o laço. */
   function finish(): void {
     finished = true
-    if (timer !== null) target.clearTimeout(timer)
-    timer = null
+    clearStall()
   }
 
   /** Pede o slot de novo com a próxima tentativa. */
   function rebid(): void {
+    slot.setConfig({ targeting: tryTargeting(ladder, attempt + 1) })
     attempt += 1
-    slot.setConfig({ targeting: tryTargeting(ladder, attempt) })
     googletag.pubads().refresh([slot])
   }
 
   return {
     onEmpty: () => {
+      clearStall()
       if (finished) return false
       const expired = Date.now() - startedAt > CASCADE_MAX_MS
       if (expired || attempt >= CASCADE_TRIES || safely(rebid) === null) {
         finish()
         return false
       }
-      if (timer === null) {
-        timer = target.setTimeout(() => {
-          if (finished) return
-          finish()
-          deps.onExpire?.()
-        }, Math.max(CASCADE_MAX_MS - (Date.now() - startedAt), 0))
-      }
+      return true
+    },
+    requested: () => {
+      if (finished) return
+      if (!requestSeen) startedAt = Date.now()
+      requestSeen = true
+      clearStall()
+      stallTimer = target.setTimeout(() => {
+        finish()
+        deps.onStall?.()
+      }, CASCADE_STALL_MS)
+    },
+    restart: () => {
+      if (!finished || safely(() => slot.setConfig({ targeting: tryTargeting(ladder, 1) })) === null) return false
+      attempt = 1
+      finished = false
+      requestSeen = false
+      startedAt = Date.now()
       return true
     },
     done: finish,

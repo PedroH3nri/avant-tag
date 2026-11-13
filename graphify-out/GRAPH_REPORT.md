@@ -1,23 +1,22 @@
-# Graph Report - wt-avant-tag-ci  (2026-11-12)
+# Graph Report - avant-tag  (2026-11-13)
 
 ## Corpus Check
-- 86 files · ~50,723 words
+- 89 files · ~53,322 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 5 file(s) not represented in the graph (top: (none) 4, .toml 1)
 
 ## Summary
-- 693 nodes · 1271 edges · 31 communities (29 shown, 2 thin omitted)
-- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 26 edges (avg confidence: 0.87)
+- 727 nodes · 1314 edges · 31 communities (29 shown, 2 thin omitted)
+- Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 27 edges (avg confidence: 0.88)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `d891816a`
+- Built from commit: `373d8b22`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - tag.ts
-- ads/index.ts
 - reward.test.ts
 - price-rules/index.ts
 - loader/index.ts
@@ -27,6 +26,7 @@
 - reward/render.ts
 - Groone Avant: contexto do projeto
 - Avant: endpoints da API do MVP
+- ads/index.ts
 - steps
 - clean-code.mjs
 - compilerOptions
@@ -46,31 +46,31 @@
 - .oxlintrc.json
 - avant-tag
 - session-start.sh
-- page-views/index.ts
+- 13. Ad tag
 
 ## God Nodes (most connected - your core abstractions)
-1. `startAds()` - 26 edges
+1. `startAds()` - 24 edges
 2. `runTag()` - 22 edges
-3. `renderReward()` - 16 edges
-4. `startReward()` - 16 edges
-5. `RewardWidget` - 16 edges
-6. `vitest` - 14 edges
-7. `compilerOptions` - 14 edges
+3. `RewardWidget` - 16 edges
+4. `renderReward()` - 16 edges
+5. `startReward()` - 15 edges
+6. `compilerOptions` - 14 edges
+7. `vitest` - 14 edges
 8. `Groone Avant: contexto do projeto` - 14 edges
-9. `GptSlot` - 12 edges
-10. `GoogleTag` - 12 edges
+9. `showRewardedAd()` - 13 edges
+10. `startCascade()` - 12 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `Contrato com a API` --references--> `sendBeacon()`  [INFERRED]
-  docs/superpowers/plans/2026-11-10-avant-tag.md → src/core/beacon.ts
-- `Rotas (avant-api)` --references--> `sendBeacon()`  [INFERRED]
-  docs/decisoes/12-rewards-e-quiz.md → src/core/beacon.ts
 - `O script `g-tag` (repositório `iGroone/G-Tag`)` --references--> `sendBeacon()`  [INFERRED]
   docs/decisoes/13-ad-tag.md → src/core/beacon.ts
 - `Rotas (avant-api)` --references--> `sendBeacon()`  [INFERRED]
   docs/decisoes/13-ad-tag.md → src/core/beacon.ts
-- `Modelo (avant-core, domínio novo `rewards/`)` --references--> `shadow()`  [INFERRED]
-  docs/decisoes/12-rewards-e-quiz.md → tests/reward/reward.test.ts
+- `Contrato com a API` --references--> `sendBeacon()`  [INFERRED]
+  docs/superpowers/plans/2026-11-10-avant-tag.md → src/core/beacon.ts
+- `Rotas (avant-api)` --references--> `sendBeacon()`  [INFERRED]
+  docs/decisoes/12-rewards-e-quiz.md → src/core/beacon.ts
+- `setup()` --calls--> `startAds()`  [EXTRACTED]
+  tests/ads/cascade.test.ts → src/ads/index.ts
 
 ## Import Cycles
 - None detected.
@@ -78,28 +78,24 @@
 ## Communities (31 total, 2 thin omitted)
 
 ### Community 0 - "tag.ts"
-Cohesion: 0.07
-Nodes (50): vitest, AdsRun, GTAG_SOURCE, GtagWindow, startAnalytics(), cachedConfig(), loadConfig(), localStore() (+42 more)
-
-### Community 1 - "ads/index.ts"
-Cohesion: 0.06
-Nodes (38): CascadeDeps, ensureGpt(), GoogleTag, GPT_SOURCE, gptReady(), GptSlot, GptSlotEvent, GptWindow (+30 more)
+Cohesion: 0.05
+Nodes (67): vitest, AdsRun, GTAG_SOURCE, GtagWindow, startAnalytics(), cachedConfig(), loadConfig(), localStore() (+59 more)
 
 ### Community 2 - "reward.test.ts"
-Cohesion: 0.08
-Nodes (39): REWARD_CASCADE_ENABLED, AdOutcome, FONT_STACKS, fontStylesheet(), OFFERWALL_SELECTOR, OFFERWALL_WAIT_MS, RenderOptions, apiOrigin() (+31 more)
+Cohesion: 0.07
+Nodes (45): REWARD_CASCADE_ENABLED, REWARD_REBID_ENABLED, AdOutcome, FONT_STACKS, fontStylesheet(), OFFERWALL_SELECTOR, OFFERWALL_WAIT_MS, RenderOptions (+37 more)
 
 ### Community 3 - "price-rules/index.ts"
 Cohesion: 0.05
-Nodes (42): Cascade, CASCADE_KINDS, startCascade(), rebid(), tryTargeting(), BlockKind, PriceFloorsResponse, adTargeting() (+34 more)
+Nodes (44): Cascade, CASCADE_KINDS, CASCADE_STALL_MS, startCascade(), clearStall(), finish(), rebid(), tryTargeting() (+36 more)
 
 ### Community 4 - "loader/index.ts"
 Cohesion: 0.09
-Nodes (38): PublicLoader, ADBLOCK_KEY, ADBLOCK_PROBE, detectAdblock(), sessionStore(), channels(), inkFor(), tint() (+30 more)
+Nodes (39): PublicLoader, ADBLOCK_KEY, ADBLOCK_PROBE, detectAdblock(), sessionStore(), channels(), inkFor(), tint() (+31 more)
 
 ### Community 5 - "package.json"
 Cohesion: 0.06
-Nodes (34): description, devDependencies, jsdom@^30.1.3, oxlint@^1.89.0, @types/node@^24.19.2, typescript@~6.0.3, vite@^8.3.5, vitest@^5.0.5 (+26 more)
+Nodes (35): description, devDependencies, jsdom@^30.1.3, oxlint@^1.89.0, @types/node@^24.19.2, typescript@~6.0.3, vite@^8.3.5, vitest@^5.0.5 (+27 more)
 
 ### Community 6 - "Avant: models do MVP"
 Cohesion: 0.07
@@ -114,20 +110,24 @@ Cohesion: 0.26
 Nodes (19): accentGradient(), channels(), luminance(), mix(), shade(), toHex(), fontStack(), answersView() (+11 more)
 
 ### Community 9 - "Groone Avant: contexto do projeto"
-Cohesion: 0.11
-Nodes (15): Arquitetura, Como trabalhar nos repositórios, Dicas de ambiente para o agente, Documentos de decisão, GAM, Groone Avant: contexto do projeto, Identidade visual, Infraestrutura e operação (+7 more)
+Cohesion: 0.10
+Nodes (17): Arquitetura, Como trabalhar nos repositórios, Dicas de ambiente para o agente, Documentos de decisão, GAM, Groone Avant: contexto do projeto, Identidade visual, Infraestrutura e operação (+9 more)
 
 ### Community 10 - "Avant: endpoints da API do MVP"
 Cohesion: 0.12
 Nodes (16): API first e chaves de API, Atribuição de sites, Avant: endpoints da API do MVP, Catálogo de permissões, Convenções, Convites, Decisões de Pedro (23/10/2026), Empresa (+8 more)
+
+### Community 11 - "ads/index.ts"
+Cohesion: 0.05
+Nodes (43): Rotas (avant-api), CascadeDeps, LADDER_KINDS, SINGLE_TRY_KINDS, ensureGpt(), GoogleTag, GPT_SOURCE, gptReady() (+35 more)
 
 ### Community 12 - "steps"
 Cohesion: 0.12
 Nodes (16): jobs, tag, name, on, push, workflow_dispatch, permissions, contents (+8 more)
 
 ### Community 13 - "clean-code.mjs"
-Cohesion: 0.15
-Nodes (11): allComments(), ALLOWED_SIDE_COMMENTS, checkFile(), checkScript(), visit(), commentLines(), leadingComments(), namedFunction() (+3 more)
+Cohesion: 0.07
+Nodes (23): playwright, allComments(), ALLOWED_SIDE_COMMENTS, checkFile(), checkScript(), visit(), commentLines(), leadingComments() (+15 more)
 
 ### Community 14 - "compilerOptions"
 Cohesion: 0.12
@@ -146,8 +146,8 @@ Cohesion: 0.17
 Nodes (11): 2FA, Avant: fluxos de login e convite, Com Google, Com senha, Convite e primeiro acesso, Decisões de Pedro (23/10/2026), Endpoints de autenticação, Escolha da Empresa ativa (+3 more)
 
 ### Community 18 - "12. Rewards e quiz (plano)"
-Cohesion: 0.18
-Nodes (10): 12. Rewards e quiz (plano), Decisões já tomadas com o Pedro, Infra (avant-infra), Modelo (avant-core, domínio novo `rewards/`), O que já existe e o reward usa, Ordem e issues, Respostas do Pedro (09/11), Script do site e telas (avant-web) (+2 more)
+Cohesion: 0.20
+Nodes (9): 12. Rewards e quiz (plano), Decisões já tomadas com o Pedro, Infra (avant-infra), Modelo (avant-core, domínio novo `rewards/`), O que já existe e o reward usa, Ordem e issues, Respostas do Pedro (09/11), Script do site e telas (avant-web) (+1 more)
 
 ### Community 19 - "Review Focus"
 Cohesion: 0.17
@@ -189,9 +189,9 @@ Nodes (4): 11. Retenção do histórico e limpeza confiável, A auditoria deixa 
 Cohesion: 0.50
 Nodes (3): plugins, rules, $schema
 
-### Community 31 - "page-views/index.ts"
-Cohesion: 0.08
-Nodes (35): Rotas (avant-api), 13. Ad tag, Ajustes do protótipo (Pedro, 09/11), Como o Genius faz hoje, Implementação da saúde e das visitas (core#310, 10/11), Infra (avant-infra), Modelo (avant-core, domínio novo `ad_tags/`), O que dá para fazer melhor (+27 more)
+### Community 31 - "13. Ad tag"
+Cohesion: 0.12
+Nodes (16): 13. Ad tag, Ajustes do protótipo (Pedro, 09/11), Como o Genius faz hoje, Implementação da saúde e das visitas (core#310, 10/11), Infra (avant-infra), Modelo (avant-core, domínio novo `ad_tags/`), O que dá para fazer melhor, O script `g-tag` (repositório `iGroone/G-Tag`) (+8 more)
 
 ## Knowledge Gaps
 - **2 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
@@ -199,17 +199,17 @@ Nodes (35): Rotas (avant-api), 13. Ad tag, Ajustes do protótipo (Pedro, 09/11),
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `vitest` connect `tag.ts` to `ads/index.ts`, `reward.test.ts`, `price-rules/index.ts`, `loader/index.ts`, `package.json`, `page-views/index.ts`?**
-  _High betweenness centrality (0.113) - this node is a cross-community bridge._
+- **Why does `vitest` connect `tag.ts` to `reward.test.ts`, `price-rules/index.ts`, `loader/index.ts`, `package.json`, `ads/index.ts`?**
+  _High betweenness centrality (0.136) - this node is a cross-community bridge._
 - **Are the 4 inferred relationships involving `startAds()` (e.g. with `.display()` and `.enableServices()`) actually correct?**
   _`startAds()` has 4 INFERRED edges - model-reasoned connections that need verification._
 - **Should `tag.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.06664198445020363 - nodes in this community are weakly interconnected._
-- **Why does `sendBeacon()` connect `page-views/index.ts` to `tag.ts`, `ads/index.ts`, `Review Focus`?**
-  _High betweenness centrality (0.067) - this node is a cross-community bridge._
-- **Should `ads/index.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.06101190476190476 - nodes in this community are weakly interconnected._
-- **Why does `GptPubAds` connect `Groone Avant: contexto do projeto` to `ads/index.ts`?**
-  _High betweenness centrality (0.034) - this node is a cross-community bridge._
+  _Cohesion score 0.05263157894736842 - nodes in this community are weakly interconnected._
+- **Why does `sendBeacon()` connect `ads/index.ts` to `tag.ts`, `Review Focus`, `13. Ad tag`?**
+  _High betweenness centrality (0.074) - this node is a cross-community bridge._
 - **Should `reward.test.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.0818452380952381 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.07042253521126761 - nodes in this community are weakly interconnected._
+- **Why does `typescript` connect `package.json` to `clean-code.mjs`?**
+  _High betweenness centrality (0.060) - this node is a cross-community bridge._
+- **Should `price-rules/index.ts` be split into smaller, more focused modules?**
+  _Cohesion score 0.05268065268065268 - nodes in this community are weakly interconnected._
