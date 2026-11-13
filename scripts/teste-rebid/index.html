@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Teste do rebid da Cascata</title>
+<script async src="https://securepubads.g.doubleclick.net/tag/js/gpt.js"></script>
+<style>
+  body { font: 14px/1.4 system-ui, sans-serif; margin: 16px; }
+  #slot { min-height: 50px; outline: 1px dashed #999; margin: 16px 0; }
+  pre { background: #f4f4f4; padding: 8px; white-space: pre-wrap; }
+  .espaco { height: 1600px; }
+</style>
+</head>
+<body>
+<h1>Rebid da Cascata pelo refresh() do mesmo slot</h1>
+<p>Use <code>?formato=anchor|fixed|content|interstitial|rewarded</code> e, se quiser,
+<code>&amp;caminho=/rede/ad_unit</code>. O padrão é um ad unit que não existe na rede de exemplo do
+Google, que sempre volta vazio.</p>
+<div id="slot"></div>
+<pre id="log"></pre>
+<div class="espaco"></div>
+<script>
+  /* Teste manual do avant-tag#18: o slot vazio pede de novo com refresh() até 4 vezes. */
+  const params = new URLSearchParams(location.search)
+  const formato = params.get('formato') || 'anchor'
+  const caminho = params.get('caminho') || '/6355419/avant-teste-rebid-vazio'
+  const ladder = ['1.22', '1.13', '1.05']
+  const inicio = performance.now()
+  window.__resultado = { formato, caminho, definido: false, eventos: [], refreshes: 0, erros: [] }
+
+  /** Guarda um evento com o tempo desde o início e mostra na página. */
+  function registra(nome, dados) {
+    const linha = { ms: Math.round(performance.now() - inicio), nome, ...dados }
+    window.__resultado.eventos.push(linha)
+    document.getElementById('log').textContent += JSON.stringify(linha) + '\n'
+  }
+
+  window.googletag = window.googletag || { cmd: [] }
+  googletag.cmd.push(() => {
+    const formats = googletag.enums.OutOfPageFormat
+    let slot = null
+    if (formato === 'anchor') slot = googletag.defineOutOfPageSlot(caminho, formats.BOTTOM_ANCHOR)
+    else if (formato === 'interstitial') slot = googletag.defineOutOfPageSlot(caminho, formats.INTERSTITIAL)
+    else if (formato === 'rewarded') slot = googletag.defineOutOfPageSlot(caminho, formats.REWARDED)
+    else if (formato === 'fixed') slot = googletag.defineSlot(caminho, [[320, 50]], 'slot')
+    else slot = googletag.defineSlot(caminho, [[300, 250], [336, 280], 'fluid'], 'slot')
+    if (!slot) {
+      registra('slot-nulo', { motivo: 'o GPT não aceitou o formato nesta página' })
+      window.__resultado.fim = true
+      return
+    }
+    window.__resultado.definido = true
+    let tentativa = 1
+    slot.setConfig({ targeting: { groone_prices: ladder[0], groone_try: '1' } })
+    slot.addService(googletag.pubads())
+    const pubads = googletag.pubads()
+    for (const nome of ['slotRequested', 'slotResponseReceived', 'slotOnload', 'impressionViewable']) {
+      pubads.addEventListener(nome, (event) => event.slot === slot && registra(nome, { tentativa }))
+    }
+    pubads.addEventListener('rewardedSlotReady', (event) => {
+      if (event.slot === slot) registra('rewardedSlotReady', { tentativa })
+    })
+    pubads.addEventListener('slotRenderEnded', (event) => {
+      if (event.slot !== slot) return
+      registra('slotRenderEnded', { tentativa, vazio: event.isEmpty })
+      if (!event.isEmpty || tentativa >= 4) {
+        window.__resultado.fim = true
+        return
+      }
+      tentativa += 1
+      const price = tentativa < 4 ? ladder[tentativa - 1] : null
+      try {
+        slot.setConfig({ targeting: { groone_prices: price, groone_try: String(tentativa) } })
+        googletag.pubads().refresh([slot])
+        window.__resultado.refreshes += 1
+        registra('refresh', { tentativa })
+      } catch (erro) {
+        window.__resultado.erros.push(String(erro))
+        registra('erro', { mensagem: String(erro) })
+      }
+    })
+    googletag.enableServices()
+    googletag.display(formato === 'fixed' || formato === 'content' ? 'slot' : slot)
+    if (formato === 'anchor' || formato === 'interstitial') window.scrollTo(0, 400)
+  })
+</script>
+</body>
+</html>
