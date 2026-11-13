@@ -148,7 +148,7 @@ describe('startCascade', () => {
       throw new Error('GPT')
     })
     const slot = fake.googletag.defineOutOfPageSlot(ANCHOR_PATH, 3) as GptSlot
-    const cascade = startCascade({ googletag: fake.googletag, slot, ladder: LADDER })
+    const cascade = startCascade({ target: window, googletag: fake.googletag, slot, ladder: LADDER })
     expect(cascade.onEmpty()).toBe(false)
   })
 })
@@ -207,6 +207,20 @@ describe('laço da Cascata', () => {
     expect(onEmpty).not.toHaveBeenCalled()
     fake.emit('slotRenderEnded', { slot, isEmpty: true })
     expect(ads.results()).toEqual([{ type: 'Anchor', state: 'empty' }])
+    expect(onEmpty).toHaveBeenCalledTimes(1)
+    expect(fake.refresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('o rebid que o GPT nunca responde: em 10 s grava empty e chama onEmpty uma vez', async () => {
+    const { fake, ads, onEmpty } = await setup([block({})])
+    const slot = fake.slots[0] as GptSlot
+    fake.emit('slotRenderEnded', { slot, isEmpty: true })
+    await vi.advanceTimersByTimeAsync(9_999)
+    expect(onEmpty).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(ads.results()).toEqual([{ type: 'Anchor', state: 'empty' }])
+    expect(onEmpty).toHaveBeenCalledTimes(1)
+    fake.emit('slotRenderEnded', { slot, isEmpty: true })
     expect(onEmpty).toHaveBeenCalledTimes(1)
     expect(fake.refresh).toHaveBeenCalledTimes(1)
   })
@@ -344,6 +358,30 @@ describe('laço da Cascata', () => {
     fake.emit('slotRenderEnded', { slot, isEmpty: true })
     expect(fake.refresh).toHaveBeenCalledTimes(5)
     expect(ads.results()).toEqual([{ type: 'Anchor', state: 'empty' }])
+  })
+
+  it('o refresh por tempo pula a vez enquanto a escada do refresh anterior ainda está no ar', () => {
+    const fake = fakeGoogletag()
+    const slot = fake.googletag.defineOutOfPageSlot(ANCHOR_PATH, 3) as FakeSlot
+    const cascade = startCascade({ target: window, googletag: fake.googletag, slot, ladder: LADDER })
+    expect(cascade.restart()).toBe(false)
+    cascade.done()
+    expect(cascade.restart()).toBe(true)
+    expect(cascade.onEmpty()).toBe(true)
+    expect(slot.targeting).toEqual({ groone_prices: '1.13', groone_try: '2' })
+    expect(cascade.restart()).toBe(false)
+  })
+
+  it('se o setConfig do recomeço falha, o refresh pula a vez e o laço não muda', () => {
+    const fake = fakeGoogletag()
+    const slot = fake.googletag.defineOutOfPageSlot(ANCHOR_PATH, 3) as FakeSlot
+    const cascade = startCascade({ target: window, googletag: fake.googletag, slot, ladder: LADDER })
+    cascade.done()
+    slot.setConfig = () => {
+      throw new Error('GPT')
+    }
+    expect(cascade.restart()).toBe(false)
+    expect(cascade.onEmpty()).toBe(false)
   })
 })
 

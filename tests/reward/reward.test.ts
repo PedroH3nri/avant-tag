@@ -257,6 +257,11 @@ function listen(listeners: Listeners, name: string, listener: (event: object) =>
   listeners.set(name, [...(listeners.get(name) ?? []), listener])
 }
 
+/** Tira o ouvinte da lista do evento, como o `removeEventListener` do GPT. */
+function unlisten(listeners: Listeners, name: string, listener: (event: object) => void): void {
+  listeners.set(name, (listeners.get(name) ?? []).filter((saved) => saved !== listener))
+}
+
 /** Dispara o evento para todos os ouvintes dele. */
 function emitter(listeners: Listeners) {
   return {
@@ -278,7 +283,7 @@ describe('anúncio premiado', () => {
         slots.push(slot)
         return slot
       },
-      pubads: () => ({ addEventListener: (name: string, listener: (event: object) => void) => listen(listeners, name, listener) }),
+      pubads: () => ({ addEventListener: (name: string, listener: (event: object) => void) => listen(listeners, name, listener), removeEventListener: (name: string, listener: (event: object) => void) => unlisten(listeners, name, listener) }),
       enableServices: () => undefined,
       display: () => undefined,
       destroySlots: () => true,
@@ -349,6 +354,7 @@ describe('Cascata no anúncio premiado', () => {
       defineOutOfPageSlot,
       pubads: () => ({
         addEventListener: (name: string, listener: (event: object) => void) => listen(listeners, name, listener),
+        removeEventListener: (name: string, listener: (event: object) => void) => unlisten(listeners, name, listener),
         refresh,
       }),
       setConfig: (config: Record<string, unknown>) => pageConfigs.push(config),
@@ -418,13 +424,14 @@ describe('Cascata no anúncio premiado', () => {
     expect(refresh).toHaveBeenCalledTimes(1)
   })
 
-  it('o 2º anúncio na página convive com os ouvintes do 1º, que o GPT mantém', async () => {
+  it('o 1º anúncio tira os ouvintes dele ao terminar, e o 2º funciona sozinho', async () => {
     const { listeners, slots, empty, refresh } = cascadeGoogleTag()
     const first = showRewardedAd([PATH_A], window, ladderOf)
     listeners.get('rewardedSlotClosed')({ slot: slots[0] })
     expect(await first).toBe('closed')
+    expect(listeners.count('slotRenderEnded')).toBe(0)
     const second = showRewardedAd([PATH_A], window, ladderOf)
-    expect(listeners.count('slotRenderEnded')).toBe(2)
+    expect(listeners.count('slotRenderEnded')).toBe(1)
     empty(slots[1] as object)
     expect(refresh).toHaveBeenCalledTimes(1)
     expect(refresh).toHaveBeenCalledWith([slots[1]])

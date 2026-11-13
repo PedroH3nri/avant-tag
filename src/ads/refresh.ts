@@ -9,14 +9,14 @@ export const MAX_REFRESHES = 5
 const MIN_RATIO = 0.5
 const TICK_MS = 1000
 
-/** Liga o refresh do slot observando o elemento; devolve a função que desliga. */
+/** Liga o refresh do slot observando o elemento; `beforeRefresh` falso pula a vez. Devolve a função que desliga. */
 export function startRefresh(
   target: Window,
   googletag: GoogleTag,
   slot: GptSlot,
   element: Element,
   seconds: number,
-  beforeRefresh?: () => void,
+  beforeRefresh?: () => boolean,
 ): () => void {
   let visible = false
   let elapsed = 0
@@ -38,7 +38,7 @@ export function startRefresh(
     elapsed = 0
     count += 1
     googletag.cmd.push(() => {
-      beforeRefresh?.()
+      if (beforeRefresh && !beforeRefresh()) return
       googletag.pubads().refresh([slot])
     })
     if (count >= MAX_REFRESHES) stop()

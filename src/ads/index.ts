@@ -5,7 +5,6 @@
 
 import { sendBeacon } from '../core/beacon'
 import { blockAllowed } from '../core/paths'
-import { safely } from '../core/safely'
 import type { Device, PublicAdTag, PublicBlock } from '../core/types'
 import { CASCADE_KINDS, startCascade, type Cascade } from './cascade'
 import { ensureGpt, gptReady, type GoogleTag, type GptSlot, type GptSlotEvent } from './gpt'
@@ -134,7 +133,7 @@ export function startAds(config: PublicAdTag, deps: AdsDeps): AdsRun {
         defined.push(found)
         const ladder = CASCADE_KINDS.includes(block.kind) ? extra?.cascade?.(path) : null
         if (ladder) {
-          cascades.set(slot, startCascade({ googletag, slot, ladder }))
+          cascades.set(slot, startCascade({ target, googletag, slot, ladder, onStall: () => settleEmpty(found) }))
         }
       }
       /** Grava o bloco como vazio e avisa uma vez só, mesmo que o fim venha por dois caminhos. */
@@ -163,7 +162,7 @@ export function startAds(config: PublicAdTag, deps: AdsDeps): AdsRun {
         const element = page.getElementById(blockElementId(found.block))
         if (found.block.refresh_seconds && element && !refreshing.has(found.slot)) {
           refreshing.add(found.slot)
-          const beforeRefresh = cascade ? () => safely(() => cascade.restart()) : undefined
+          const beforeRefresh = cascade ? () => cascade.restart() : undefined
           startRefresh(target, googletag, found.slot, element, found.block.refresh_seconds, beforeRefresh)
         }
       }

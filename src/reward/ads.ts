@@ -32,6 +32,7 @@ export interface GoogleTag {
   defineOutOfPageSlot(path: string, format: number): RewardedSlot | null
   pubads(): {
     addEventListener(name: string, listener: (event: SlotEvent) => void): void
+    removeEventListener?(name: string, listener: (event: SlotEvent) => void): void
     refresh(slots: RewardedSlot[]): void
   }
   setConfig(config: Record<string, unknown>): void
@@ -74,6 +75,7 @@ export function showRewardedAd(paths: string[], target: Window = window, rewardC
       target.clearTimeout(timer)
       cascade?.done()
       if (current) (target as RewardWindow).googletag?.destroySlots?.([current])
+      unlisten()
       resolve(outcome)
     }
 
@@ -89,7 +91,7 @@ export function showRewardedAd(paths: string[], target: Window = window, rewardC
       const ladder = rewardCascade?.ladderOfPath(path)
       const slot = current
       if (ladder && safely(() => slot.setConfig({ targeting: tryTargeting(ladder, 1) })) !== null) {
-        cascade = startCascade({ googletag, slot, ladder })
+        cascade = startCascade({ target, googletag, slot, ladder, onStall: () => moveOn(googletag, slot) })
       }
       googletag.display(current)
     }
@@ -103,28 +105,42 @@ export function showRewardedAd(paths: string[], target: Window = window, rewardC
     }
 
     let pending: string[] = []
+    const listeners: Array<[string, (event: SlotEvent) => void]> = []
+
+    /** Tira os ouvintes deste anúncio do GPT, para o próximo anúncio da página não carregar os antigos. */
+    function unlisten(): void {
+      const ads = safely(() => ((target as RewardWindow).googletag as GoogleTag).pubads())
+      for (const [name, listener] of listeners.splice(0)) safely(() => ads?.removeEventListener?.(name, listener))
+    }
+
     const queue = (target as RewardWindow).googletag?.cmd
     queue?.push(() => {
+      if (finished) return
       const googletag = (target as RewardWindow).googletag as GoogleTag
-      const ads = googletag.pubads()
-      ads.addEventListener('rewardedSlotReady', (event) => {
+      const pubads = googletag.pubads()
+      /** Liga o ouvinte no GPT e guarda para tirar no fim. */
+      const listen = (name: string, listener: (event: SlotEvent) => void): void => {
+        listeners.push([name, listener])
+        pubads.addEventListener(name, listener)
+      }
+      listen('rewardedSlotReady', (event) => {
         if (event.slot !== current) return
         target.clearTimeout(timer)
         cascade?.done()
         event.makeRewardedVisible?.()
       })
-      ads.addEventListener('slotRequested', (event) => {
+      listen('slotRequested', (event) => {
         if (event.slot === current) cascade?.requested()
       })
-      ads.addEventListener('slotRenderEnded', (event) => {
+      listen('slotRenderEnded', (event) => {
         if (event.slot !== current || !event.isEmpty) return
         if (cascade?.onEmpty()) return
         moveOn(googletag, event.slot)
       })
-      ads.addEventListener('rewardedSlotGranted', (event) => {
+      listen('rewardedSlotGranted', (event) => {
         if (event.slot === current) granted = true
       })
-      ads.addEventListener('rewardedSlotClosed', (event) => {
+      listen('rewardedSlotClosed', (event) => {
         if (event.slot === current) finish(granted ? 'granted' : 'closed')
       })
       if (rewardCascade) safely(() => googletag.setConfig({ targeting: { [GROUP_KEY]: rewardCascade.group } }))

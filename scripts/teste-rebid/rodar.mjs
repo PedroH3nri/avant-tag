@@ -7,7 +7,7 @@ import { createServer } from 'node:http'
 import { readFile } from 'node:fs/promises'
 import { chromium, devices } from 'playwright'
 
-const FORMATS = ['anchor', 'fixed', 'content', 'interstitial', 'rewarded']
+const FORMATS = ['anchor', 'fixed', 'content', 'content-lazy', 'interstitial', 'rewarded']
 const WAIT_MS = 20_000
 const pageHtml = await readFile(new URL('./index.html', import.meta.url))
 
@@ -23,14 +23,21 @@ async function runFormat(browser, format, deviceName) {
   const page = await context.newPage()
   const adRequests = []
   page.on('request', (request) => {
-    if (request.url().includes('/gampad/ads')) adRequests.push(new URL(request.url()).searchParams.get('cust_params') ?? '')
+    if (!request.url().includes('/gampad/ads')) return
+    const query = new URL(request.url()).searchParams
+    adRequests.push({ prev_scp: query.get('prev_scp'), scp: query.get('scp'), cust_params: query.get('cust_params') })
   })
-  await page.goto(`http://localhost:8765/?formato=${format}`)
+  const lazy = format === 'content-lazy'
+  await page.goto(`http://localhost:8765/?formato=${lazy ? 'content&lazy=1' : format}`)
+  if (lazy) {
+    await page.waitForTimeout(4000)
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+  }
   await page.waitForFunction(() => window.__resultado?.fim === true, null, { timeout: WAIT_MS }).catch(() => null)
   await page.waitForTimeout(1500)
   const result = await page.evaluate(() => window.__resultado)
   await context.close()
-  return { aparelho: deviceName ?? 'desktop', pedidos_ao_gam: adRequests.length, cust_params: adRequests, ...result }
+  return { aparelho: deviceName ?? 'desktop', pedidos_ao_gam: adRequests.length, parametros: adRequests, ...result }
 }
 
 const browser = await chromium.launch({ headless: false, channel: process.env.CANAL ?? 'chrome' }).catch(() =>
