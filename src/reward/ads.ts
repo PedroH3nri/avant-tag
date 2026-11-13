@@ -91,8 +91,10 @@ export function showRewardedAd(paths: string[], target: Window = window, rewardC
       cascade = null
       const ladder = rewardCascade?.ladderOfPath(path)
       const slot = current
-      const firstTry = ladder ? safely(() => slot.setConfig({ targeting: tryTargeting(ladder, 1) })) : null
-      if (ladder && firstTry !== null && rewardCascade?.rebid) {
+      const group = rewardCascade ? { [GROUP_KEY]: rewardCascade.group } : {}
+      const keys = { ...group, ...(ladder ? tryTargeting(ladder, 1) : {}) }
+      const targetingApplied = Object.keys(keys).length > 0 ? safely(() => slot.setConfig({ targeting: keys })) : null
+      if (ladder && targetingApplied !== null && rewardCascade?.rebid) {
         cascade = startCascade({ target, googletag, slot, ladder, onStall: () => moveOn(googletag, slot) })
       }
       googletag.display(current)
@@ -145,7 +147,6 @@ export function showRewardedAd(paths: string[], target: Window = window, rewardC
       listen('rewardedSlotClosed', (event) => {
         if (event.slot === current) finish(granted ? 'granted' : 'closed')
       })
-      if (rewardCascade) safely(() => googletag.setConfig({ targeting: { [GROUP_KEY]: rewardCascade.group } }))
       googletag.enableServices()
       tryNext(googletag, paths)
     })

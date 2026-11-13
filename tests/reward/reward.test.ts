@@ -381,7 +381,7 @@ describe('Cascata no anúncio premiado', () => {
   it('sem rebid (o padrão): 1º degrau com groone_try=1 e, vazio, segue para o próximo caminho', () => {
     const { slots, refresh, defineOutOfPageSlot, empty } = cascadeGoogleTag()
     void showRewardedAd([PATH_A, PATH_B], window, { ...ladderOf, rebid: false })
-    expect(slots[0]?.targeting).toEqual({ groone_prices: '1.22', groone_try: '1' })
+    expect(slots[0]?.targeting).toEqual({ groone_group: 'regra', groone_prices: '1.22', groone_try: '1' })
     empty(slots[0] as object)
     expect(refresh).not.toHaveBeenCalled()
     expect(defineOutOfPageSlot).toHaveBeenCalledTimes(2)
@@ -390,10 +390,10 @@ describe('Cascata no anúncio premiado', () => {
   it('refaz o pedido do mesmo slot com o próximo degrau, sem definir outro', () => {
     const { slots, refresh, destroySlots, defineOutOfPageSlot, empty } = cascadeGoogleTag()
     void showRewardedAd([PATH_A, PATH_B], window, ladderOf)
-    expect(slots[0]?.targeting).toEqual({ groone_prices: '1.22', groone_try: '1' })
+    expect(slots[0]?.targeting).toEqual({ groone_group: 'regra', groone_prices: '1.22', groone_try: '1' })
     empty(slots[0] as object)
     expect(refresh).toHaveBeenCalledWith([slots[0]])
-    expect(slots[0]?.targeting).toEqual({ groone_prices: '1.13', groone_try: '2' })
+    expect(slots[0]?.targeting).toEqual({ groone_group: 'regra', groone_prices: '1.13', groone_try: '2' })
     expect(defineOutOfPageSlot).toHaveBeenCalledTimes(1)
     expect(destroySlots).not.toHaveBeenCalled()
   })
@@ -404,14 +404,14 @@ describe('Cascata no anúncio premiado', () => {
     empty(slots[0] as object)
     empty(slots[0] as object)
     empty(slots[0] as object)
-    expect(slots[0]?.targeting).toEqual({ groone_try: '4' })
+    expect(slots[0]?.targeting).toEqual({ groone_group: 'regra', groone_try: '4' })
     expect(refresh).toHaveBeenCalledTimes(3)
     expect(defineOutOfPageSlot).toHaveBeenCalledTimes(1)
     empty(slots[0] as object)
     expect(destroySlots).toHaveBeenCalledWith([slots[0]])
     expect(defineOutOfPageSlot).toHaveBeenCalledTimes(2)
     expect(slots[1]?.path).toBe(PATH_B)
-    expect(slots[1]?.targeting).toEqual({})
+    expect(slots[1]?.targeting).toEqual({ groone_group: 'regra' })
     expect(refresh).toHaveBeenCalledTimes(3)
   })
 
@@ -460,7 +460,7 @@ describe('Cascata no anúncio premiado', () => {
     empty(slots[0] as object)
     expect(refresh).not.toHaveBeenCalled()
     expect(defineOutOfPageSlot).toHaveBeenCalledTimes(2)
-    expect(slots[0]?.targeting).toEqual({})
+    expect(slots[0]?.targeting).toEqual({ groone_group: 'regra' })
   })
 
   it('entrega o prêmio depois de um rebid', async () => {
@@ -512,17 +512,18 @@ describe('Cascata no anúncio premiado', () => {
   })
 
   describe('groone_group e falhas', () => {
-    it('com a escada ativa põe o groone_group da regra na página', () => {
-      const { pageConfigs } = cascadeGoogleTag()
+    it('põe o groone_group no slot do reward, nunca na página (não vaza para os outros blocos)', () => {
+      const { pageConfigs, slots } = cascadeGoogleTag()
       void showRewardedAd([PATH_A], window, ladderOf)
-      expect(pageConfigs).toEqual([{ targeting: { groone_group: 'regra' } }])
+      expect(pageConfigs).toEqual([])
+      expect(slots[0]?.targeting).toMatchObject({ groone_group: 'regra' })
     })
 
     it('o controle leva groone_group controle, sem escada nem key de preço', () => {
       const { pageConfigs, slots, refresh, empty } = cascadeGoogleTag()
       void showRewardedAd([PATH_A, PATH_B], window, { group: 'controle', ladderOfPath: () => null })
-      expect(pageConfigs).toEqual([{ targeting: { groone_group: 'controle' } }])
-      expect(slots[0]?.targeting).toEqual({})
+      expect(pageConfigs).toEqual([])
+      expect(slots[0]?.targeting).toEqual({ groone_group: 'controle' })
       empty(slots[0] as object)
       expect(refresh).not.toHaveBeenCalled()
     })

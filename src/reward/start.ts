@@ -114,8 +114,9 @@ export async function startReward(origin: string, target: Window = window): Prom
     const response = await target.fetch(`${origin}/api/reward/v2?url=${encodeURIComponent(target.location.href)}`)
     if (!response.ok) return null
     const { reward, price_rules: rules } = (await response.json()) as PublicRewardPage
+    if (!reward || deviceAdUnits(reward, target.innerWidth).length === 0) return null
     const ports = browserPorts(origin, target, rewardCascade(rules ?? null, () => visitorId(target)))
-    if (!reward || deviceAdUnits(reward, target.innerWidth).length === 0 || coolingDown(reward, ports)) return null
+    if (coolingDown(reward, ports)) return null
     const widget = new RewardWidget(reward, ports, target)
     armTrigger(reward, () => widget.open(), target)
     return widget

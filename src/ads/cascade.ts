@@ -13,6 +13,8 @@ export const CASCADE_KINDS: readonly BlockKind[] = ['anchor', 'fixed', 'content'
 
 export const SINGLE_TRY_KINDS: readonly BlockKind[] = ['interstitial']
 
+export const LADDER_KINDS: readonly BlockKind[] = [...CASCADE_KINDS, ...SINGLE_TRY_KINDS]
+
 export const REWARD_CASCADE_ENABLED = true
 
 export const REWARD_REBID_ENABLED = false

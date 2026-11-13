@@ -1,23 +1,22 @@
 # Graph Report - avant-tag  (2026-11-13)
 
 ## Corpus Check
-- 89 files · ~53,289 words
+- 89 files · ~53,322 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 5 file(s) not represented in the graph (top: (none) 4, .toml 1)
 
 ## Summary
-- 726 nodes · 1312 edges · 38 communities (35 shown, 3 thin omitted)
+- 727 nodes · 1314 edges · 31 communities (29 shown, 2 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 27 edges (avg confidence: 0.88)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `8c376684`
+- Built from commit: `373d8b22`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
-- page-views/index.ts
-- GoogleTag
+- tag.ts
 - reward.test.ts
 - price-rules/index.ts
 - loader/index.ts
@@ -48,12 +47,6 @@
 - avant-tag
 - session-start.sh
 - 13. Ad tag
-- tag.ts
-- core/index.ts
-- contentHash
-- reward.ts
-- core/types.ts
-- vitest
 
 ## God Nodes (most connected - your core abstractions)
 1. `startAds()` - 24 edges
@@ -82,19 +75,19 @@
 ## Import Cycles
 - None detected.
 
-## Communities (38 total, 3 thin omitted)
+## Communities (31 total, 2 thin omitted)
 
-### Community 0 - "page-views/index.ts"
-Cohesion: 0.20
-Nodes (16): newId(), Device, PageViewBlock, PageViewBody, PageViewDeps, PageViewRun, scrollPercent(), startPageViews() (+8 more)
+### Community 0 - "tag.ts"
+Cohesion: 0.05
+Nodes (67): vitest, AdsRun, GTAG_SOURCE, GtagWindow, startAnalytics(), cachedConfig(), loadConfig(), localStore() (+59 more)
 
 ### Community 2 - "reward.test.ts"
-Cohesion: 0.06
-Nodes (55): REWARD_CASCADE_ENABLED, REWARD_REBID_ENABLED, GROUP_KEY, AdOutcome, LadderOfPath, loadGoogleTag(), RewardCascade, RewardedSlot (+47 more)
+Cohesion: 0.07
+Nodes (45): REWARD_CASCADE_ENABLED, REWARD_REBID_ENABLED, AdOutcome, FONT_STACKS, fontStylesheet(), OFFERWALL_SELECTOR, OFFERWALL_WAIT_MS, RenderOptions (+37 more)
 
 ### Community 3 - "price-rules/index.ts"
-Cohesion: 0.07
-Nodes (30): Cascade, CASCADE_KINDS, CASCADE_STALL_MS, SINGLE_TRY_KINDS, startCascade(), clearStall(), finish(), rebid() (+22 more)
+Cohesion: 0.05
+Nodes (44): Cascade, CASCADE_KINDS, CASCADE_STALL_MS, startCascade(), clearStall(), finish(), rebid(), tryTargeting() (+36 more)
 
 ### Community 4 - "loader/index.ts"
 Cohesion: 0.09
@@ -125,8 +118,8 @@ Cohesion: 0.12
 Nodes (16): API first e chaves de API, Atribuição de sites, Avant: endpoints da API do MVP, Catálogo de permissões, Convenções, Convites, Decisões de Pedro (23/10/2026), Empresa (+8 more)
 
 ### Community 11 - "ads/index.ts"
-Cohesion: 0.06
-Nodes (38): Rotas (avant-api), CascadeDeps, ensureGpt(), GoogleTag, GPT_SOURCE, gptReady(), GptSlot, GptSlotEvent (+30 more)
+Cohesion: 0.05
+Nodes (43): Rotas (avant-api), CascadeDeps, LADDER_KINDS, SINGLE_TRY_KINDS, ensureGpt(), GoogleTag, GPT_SOURCE, gptReady() (+35 more)
 
 ### Community 12 - "steps"
 Cohesion: 0.12
@@ -200,47 +193,23 @@ Nodes (3): plugins, rules, $schema
 Cohesion: 0.12
 Nodes (16): 13. Ad tag, Ajustes do protótipo (Pedro, 09/11), Como o Genius faz hoje, Implementação da saúde e das visitas (core#310, 10/11), Infra (avant-infra), Modelo (avant-core, domínio novo `ad_tags/`), O que dá para fazer melhor, O script `g-tag` (repositório `iGroone/G-Tag`) (+8 more)
 
-### Community 32 - "tag.ts"
-Cohesion: 0.18
-Nodes (13): AdsRun, GTAG_SOURCE, GtagWindow, startAnalytics(), safely(), PublicAdTag, offerwallShown(), emptyBlockHandler() (+5 more)
-
-### Community 33 - "core/index.ts"
-Cohesion: 0.33
-Nodes (8): cachedConfig(), loadConfig(), localStore(), matchesPage(), withTimeout(), detectDevice(), normalizeDomain(), browserLanguage()
-
-### Community 34 - "contentHash"
-Cohesion: 0.22
-Nodes (10): pageKeyValues(), UTM_KEYS, wordpressPostId(), contentHash(), pageHash(), adTargeting(), fetchFloors(), groupOf() (+2 more)
-
-### Community 35 - "reward.ts"
-Cohesion: 0.23
-Nodes (9): claimPage(), FlaggedWindow, FLAGS, PagePart, domReady(), findTagScript(), scriptOrigin(), TagScript (+1 more)
-
-### Community 36 - "core/types.ts"
-Cohesion: 0.21
-Nodes (10): blockAllowed(), matchesAny(), patternExpression(), Edge, LoaderAdblock, LoaderStyle, LoaderTemplate, PublicTagResponse (+2 more)
-
-### Community 37 - "vitest"
-Cohesion: 0.29
-Nodes (8): vitest, PublicMgid, insertArticle(), loadWidgets(), MGID_SCRIPT, MgidWindow, startMgid(), widget()
-
 ## Knowledge Gaps
-- **3 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **2 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `vitest` connect `vitest` to `tag.ts`, `core/index.ts`, `page-views/index.ts`, `price-rules/index.ts`, `reward.ts`, `package.json`, `loader/index.ts`, `contentHash`, `reward.test.ts`, `ads/index.ts`?**
+- **Why does `vitest` connect `tag.ts` to `reward.test.ts`, `price-rules/index.ts`, `loader/index.ts`, `package.json`, `ads/index.ts`?**
   _High betweenness centrality (0.136) - this node is a cross-community bridge._
 - **Are the 4 inferred relationships involving `startAds()` (e.g. with `.display()` and `.enableServices()`) actually correct?**
   _`startAds()` has 4 INFERRED edges - model-reasoned connections that need verification._
-- **Should `reward.test.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.05823293172690763 - nodes in this community are weakly interconnected._
-- **Why does `sendBeacon()` connect `ads/index.ts` to `page-views/index.ts`, `core/index.ts`, `Review Focus`, `13. Ad tag`?**
+- **Should `tag.ts` be split into smaller, more focused modules?**
+  _Cohesion score 0.05263157894736842 - nodes in this community are weakly interconnected._
+- **Why does `sendBeacon()` connect `ads/index.ts` to `tag.ts`, `Review Focus`, `13. Ad tag`?**
   _High betweenness centrality (0.074) - this node is a cross-community bridge._
-- **Should `price-rules/index.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.06736353077816493 - nodes in this community are weakly interconnected._
+- **Should `reward.test.ts` be split into smaller, more focused modules?**
+  _Cohesion score 0.07042253521126761 - nodes in this community are weakly interconnected._
 - **Why does `typescript` connect `package.json` to `clean-code.mjs`?**
   _High betweenness centrality (0.060) - this node is a cross-community bridge._
-- **Should `loader/index.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.08816326530612245 - nodes in this community are weakly interconnected._
+- **Should `price-rules/index.ts` be split into smaller, more focused modules?**
+  _Cohesion score 0.05268065268065268 - nodes in this community are weakly interconnected._
