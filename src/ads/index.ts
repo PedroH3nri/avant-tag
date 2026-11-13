@@ -121,6 +121,7 @@ export function startAds(config: PublicAdTag, deps: AdsDeps): AdsRun {
       const refreshing = new Set<GptSlot>()
       const cascades = new Map<GptSlot, Cascade>()
       const emptied = new Set<GptSlot>()
+      const notified = new Set<GptSlot>()
       for (const { block, container } of placed) {
         if (block.kind === 'content' && !container) continue
         const path = blockPath(block, deps.device) as string
@@ -133,14 +134,16 @@ export function startAds(config: PublicAdTag, deps: AdsDeps): AdsRun {
         defined.push(found)
         const ladder = CASCADE_KINDS.includes(block.kind) ? extra?.cascade?.(path) : null
         if (ladder) {
-          cascades.set(slot, startCascade({ target, googletag, slot, ladder, onStall: () => settleEmpty(found) }))
+          cascades.set(slot, startCascade({ googletag, slot, ladder }))
         }
       }
-      /** Grava o bloco como vazio e avisa uma vez só, mesmo que o fim venha por dois caminhos. */
+      /** Grava o bloco como vazio; o `onEmpty` (artigo MGID) roda uma vez só por bloco na página. */
       const settleEmpty = (item: Defined): void => {
         if (emptied.has(item.slot)) return
         emptied.add(item.slot)
         results.set(item.block.unit_type, 'empty')
+        if (notified.has(item.slot)) return
+        notified.add(item.slot)
         deps.onEmpty?.(item.block, item.container)
       }
       /** Guarda como o bloco terminou, põe rótulos, refresh ou o artigo MGID. */
@@ -162,7 +165,7 @@ export function startAds(config: PublicAdTag, deps: AdsDeps): AdsRun {
         const element = page.getElementById(blockElementId(found.block))
         if (found.block.refresh_seconds && element && !refreshing.has(found.slot)) {
           refreshing.add(found.slot)
-          const beforeRefresh = cascade ? () => cascade.restart() : undefined
+          const beforeRefresh = cascade?.restart
           startRefresh(target, googletag, found.slot, element, found.block.refresh_seconds, beforeRefresh)
         }
       }

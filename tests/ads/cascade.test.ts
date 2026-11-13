@@ -118,6 +118,23 @@ async function setup(blocks: PublicBlock[], group: 'regra' | 'controle' = 'regra
   return { fake, ads, onEmpty }
 }
 
+/** Troca o IntersectionObserver por um falso e devolve a função que avisa a visibilidade. */
+function observeVisibility() {
+  const visibility = { report: (_entries: Array<Partial<IntersectionObserverEntry>>): void => undefined }
+  class FakeObserver {
+    /** Guarda quem avisa a visibilidade. */
+    constructor(callback: typeof visibility.report) {
+      visibility.report = callback
+    }
+    /** Não faz nada no teste. */
+    observe(): void {}
+    /** Não faz nada no teste. */
+    disconnect(): void {}
+  }
+  vi.stubGlobal('IntersectionObserver', FakeObserver)
+  return (entries: Array<Partial<IntersectionObserverEntry>>) => visibility.report(entries)
+}
+
 beforeEach(() => {
   vi.useFakeTimers()
   document.body.innerHTML = '<article><p id="first">Texto</p></article>'
@@ -148,7 +165,7 @@ describe('startCascade', () => {
       throw new Error('GPT')
     })
     const slot = fake.googletag.defineOutOfPageSlot(ANCHOR_PATH, 3) as GptSlot
-    const cascade = startCascade({ target: window, googletag: fake.googletag, slot, ladder: LADDER })
+    const cascade = startCascade({ googletag: fake.googletag, slot, ladder: LADDER })
     expect(cascade.onEmpty()).toBe(false)
   })
 })
@@ -207,20 +224,6 @@ describe('laço da Cascata', () => {
     expect(onEmpty).not.toHaveBeenCalled()
     fake.emit('slotRenderEnded', { slot, isEmpty: true })
     expect(ads.results()).toEqual([{ type: 'Anchor', state: 'empty' }])
-    expect(onEmpty).toHaveBeenCalledTimes(1)
-    expect(fake.refresh).toHaveBeenCalledTimes(1)
-  })
-
-  it('o rebid que o GPT nunca responde: em 10 s grava empty e chama onEmpty uma vez', async () => {
-    const { fake, ads, onEmpty } = await setup([block({})])
-    const slot = fake.slots[0] as GptSlot
-    fake.emit('slotRenderEnded', { slot, isEmpty: true })
-    await vi.advanceTimersByTimeAsync(9_999)
-    expect(onEmpty).not.toHaveBeenCalled()
-    await vi.advanceTimersByTimeAsync(1)
-    expect(ads.results()).toEqual([{ type: 'Anchor', state: 'empty' }])
-    expect(onEmpty).toHaveBeenCalledTimes(1)
-    fake.emit('slotRenderEnded', { slot, isEmpty: true })
     expect(onEmpty).toHaveBeenCalledTimes(1)
     expect(fake.refresh).toHaveBeenCalledTimes(1)
   })
@@ -325,18 +328,7 @@ describe('laço da Cascata', () => {
   })
 
   it('âncora que encheu na 2ª: o refresh por tempo só começa depois e recomeça a escada inteira', async () => {
-    let report: (entries: Array<Partial<IntersectionObserverEntry>>) => void = () => undefined
-    class FakeObserver {
-      /** Guarda quem avisa a visibilidade. */
-      constructor(callback: typeof report) {
-        report = callback
-      }
-      /** Não faz nada no teste. */
-      observe(): void {}
-      /** Não faz nada no teste. */
-      disconnect(): void {}
-    }
-    vi.stubGlobal('IntersectionObserver', FakeObserver)
+    const report = observeVisibility()
     const { fake, ads } = await setup([block({ refresh_seconds: 30 })])
     const slot = fake.slots[0] as FakeSlot
     fake.emit('slotRenderEnded', { slot, isEmpty: true })
@@ -360,10 +352,44 @@ describe('laço da Cascata', () => {
     expect(ads.results()).toEqual([{ type: 'Anchor', state: 'empty' }])
   })
 
+  it('o refresh por tempo que pula a vez não gasta uma das 5', async () => {
+    const report = observeVisibility()
+    const { fake } = await setup([block({ refresh_seconds: 30 })])
+    const slot = fake.slots[0] as FakeSlot
+    fake.emit('slotRenderEnded', { slot, isEmpty: false })
+    report([{ isIntersecting: true, intersectionRatio: 0.6 }])
+    await vi.advanceTimersByTimeAsync(30_000)
+    expect(fake.refresh).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(30_000 * 3)
+    expect(fake.refresh).toHaveBeenCalledTimes(1)
+    for (let count = 0; count < 6; count += 1) {
+      fake.emit('slotRenderEnded', { slot, isEmpty: false })
+      await vi.advanceTimersByTimeAsync(30_000)
+    }
+    expect(fake.refresh).toHaveBeenCalledTimes(5)
+  })
+
+  it('conteúdo que encheu e depois esvaziou no refresh não ganha um 2º artigo MGID', async () => {
+    const report = observeVisibility()
+    const path = '/2100/blog.com/Blog_Content1_Desktop_20261028'
+    const { fake, ads, onEmpty } = await setup([
+      block({ kind: 'content', unit_type: 'Content1', desktop: path, selector: 'article p', refresh_seconds: 30 }),
+    ])
+    const slot = fake.slots[0] as FakeSlot
+    for (let count = 0; count < 4; count += 1) fake.emit('slotRenderEnded', { slot, isEmpty: true })
+    expect(onEmpty).toHaveBeenCalledTimes(1)
+    fake.emit('slotRenderEnded', { slot, isEmpty: false })
+    report([{ isIntersecting: true, intersectionRatio: 0.6 }])
+    await vi.advanceTimersByTimeAsync(30_000)
+    for (let count = 0; count < 4; count += 1) fake.emit('slotRenderEnded', { slot, isEmpty: true })
+    expect(ads.results()).toEqual([{ type: 'Content1', state: 'empty' }])
+    expect(onEmpty).toHaveBeenCalledTimes(1)
+  })
+
   it('o refresh por tempo pula a vez enquanto a escada do refresh anterior ainda está no ar', () => {
     const fake = fakeGoogletag()
     const slot = fake.googletag.defineOutOfPageSlot(ANCHOR_PATH, 3) as FakeSlot
-    const cascade = startCascade({ target: window, googletag: fake.googletag, slot, ladder: LADDER })
+    const cascade = startCascade({ googletag: fake.googletag, slot, ladder: LADDER })
     expect(cascade.restart()).toBe(false)
     cascade.done()
     expect(cascade.restart()).toBe(true)
@@ -375,7 +401,7 @@ describe('laço da Cascata', () => {
   it('se o setConfig do recomeço falha, o refresh pula a vez e o laço não muda', () => {
     const fake = fakeGoogletag()
     const slot = fake.googletag.defineOutOfPageSlot(ANCHOR_PATH, 3) as FakeSlot
-    const cascade = startCascade({ target: window, googletag: fake.googletag, slot, ladder: LADDER })
+    const cascade = startCascade({ googletag: fake.googletag, slot, ladder: LADDER })
     cascade.done()
     slot.setConfig = () => {
       throw new Error('GPT')

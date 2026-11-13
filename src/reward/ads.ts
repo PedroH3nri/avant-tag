@@ -91,7 +91,7 @@ export function showRewardedAd(paths: string[], target: Window = window, rewardC
       const ladder = rewardCascade?.ladderOfPath(path)
       const slot = current
       if (ladder && safely(() => slot.setConfig({ targeting: tryTargeting(ladder, 1) })) !== null) {
-        cascade = startCascade({ target, googletag, slot, ladder, onStall: () => moveOn(googletag, slot) })
+        cascade = startCascade({ googletag, slot, ladder })
       }
       googletag.display(current)
     }

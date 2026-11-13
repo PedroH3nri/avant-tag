@@ -13,14 +13,10 @@ export const CASCADE_KINDS: readonly BlockKind[] = ['anchor', 'fixed', 'content'
 
 export const REWARD_CASCADE_ENABLED = false
 
-export const CASCADE_STALL_MS = 10_000
-
 export interface CascadeDeps {
-  target: Window
   googletag: { pubads(): { refresh(slots: GptSlot[]): void } }
   slot: GptSlot
   ladder: string[]
-  onStall?: () => void
 }
 
 export interface Cascade {
@@ -38,43 +34,29 @@ export function tryTargeting(ladder: string[], attempt: number): Record<string, 
 
 /**
  * Começa o laço do slot; o teto conta do 1º `slotRequested` (sem ele, da montagem) e só impede um
- * novo pedido. Se o GPT não responder a um rebid em 10 s, o laço desiste e avisa `onStall`.
+ * novo pedido: a tentativa no ar termina, e só o vazio dela encerra o laço.
  */
 export function startCascade(deps: CascadeDeps): Cascade {
-  const { target, googletag, slot, ladder } = deps
+  const { googletag, slot, ladder } = deps
   let startedAt = Date.now()
   let requestSeen = false
   let attempt = 1
   let finished = false
-  let stallTimer: number | null = null
 
-  /** Desliga o relógio da tentativa no ar. */
-  function clearStall(): void {
-    if (stallTimer !== null) target.clearTimeout(stallTimer)
-    stallTimer = null
-  }
-
-  /** Encerra o laço. */
+  /** Encerra o laço; até aqui ainda há uma tentativa no ar. */
   function finish(): void {
     finished = true
-    clearStall()
   }
 
-  /** Pede o slot de novo com a próxima tentativa e liga o relógio de quem nunca responde. */
+  /** Pede o slot de novo com a próxima tentativa. */
   function rebid(): void {
     slot.setConfig({ targeting: tryTargeting(ladder, attempt + 1) })
     attempt += 1
     googletag.pubads().refresh([slot])
-    stallTimer = target.setTimeout(() => {
-      if (finished) return
-      finish()
-      deps.onStall?.()
-    }, CASCADE_STALL_MS)
   }
 
   return {
     onEmpty: () => {
-      clearStall()
       if (finished) return false
       const expired = Date.now() - startedAt > CASCADE_MAX_MS
       if (expired || attempt >= CASCADE_TRIES || safely(rebid) === null) {
