@@ -11,7 +11,11 @@ import type { GptSlot } from './gpt'
 
 export const CASCADE_KINDS: readonly BlockKind[] = ['anchor', 'fixed', 'content']
 
-export const REWARD_CASCADE_ENABLED = false
+export const SINGLE_TRY_KINDS: readonly BlockKind[] = ['interstitial']
+
+export const REWARD_CASCADE_ENABLED = true
+
+export const REWARD_REBID_ENABLED = false
 
 export const CASCADE_STALL_MS = 5000
 

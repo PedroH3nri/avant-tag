@@ -3,7 +3,7 @@
  * escolhido (ao carregar, na rolagem ou no clique). Usado pelo tag.js e pelo reward.js.
  */
 
-import { REWARD_CASCADE_ENABLED } from '../ads/cascade'
+import { REWARD_CASCADE_ENABLED, REWARD_REBID_ENABLED } from '../ads/cascade'
 import { localStore } from '../core/config'
 import { visitorId } from '../page-views'
 import { blockOfPath, groupOf, RULE_GROUP } from '../price-rules'
@@ -50,17 +50,19 @@ export function browserPorts(origin: string, target: Window = window, cascade?: 
   }
 }
 
-/** O grupo e a escada de cada caminho; nada com a flag desligada ou sem regra, e sem escada no controle. */
+/** O grupo e a escada de cada caminho (sem rebid, só o 1º degrau); nada com a flag desligada ou sem regra, e sem escada no controle. */
 export function rewardCascade(
   rules: RewardPriceRules | null,
   visitor: () => string,
   enabled: boolean = REWARD_CASCADE_ENABLED,
+  rebid: boolean = REWARD_REBID_ENABLED,
 ): RewardCascade | undefined {
   if (!enabled || !rules) return undefined
   const group = groupOf(visitor(), rules.control_percent)
   if (group !== RULE_GROUP) return { group, ladderOfPath: () => null }
   return {
     group,
+    rebid,
     ladderOfPath: (path) => {
       const block = blockOfPath(path)
       const ladder = block ? rules.cascades[block] : undefined

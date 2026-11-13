@@ -328,9 +328,9 @@ describe('laço da Cascata', () => {
   })
 
   it.each([
-    ['Cascata', { floors: {}, cascades: { Interstitial_Desktop: LADDER } }, {}],
+    ['Cascata', { floors: {}, cascades: { Interstitial_Desktop: LADDER } }, { groone_prices: '1.22', groone_try: '1' }],
     ['Automática', { floors: { Interstitial_Desktop: '0.90' }, cascades: {} }, { groone_prices: '0.90' }],
-  ])('intersticial na %s ainda não entra no laço e leva só as keys certas', async (_model, rules, keys) => {
+  ])('intersticial na %s: uma tentativa só, sem rebid, com as keys certas', async (_model, rules, keys) => {
     const path = '/2100/blog.com/Blog_Interstitial_Desktop_20261028'
     const fake = fakeGoogletag()
     ;(window as Window & { googletag?: GoogleTag }).googletag = fake.googletag
@@ -345,7 +345,6 @@ describe('laço da Cascata', () => {
     await vi.advanceTimersByTimeAsync(500)
     const slot = fake.slots[0] as FakeSlot
     expect(slot.targeting).toEqual(keys)
-    expect(slot.targeting).not.toHaveProperty('groone_try')
     fake.emit('slotRenderEnded', { slot, isEmpty: true })
     expect(fake.refresh).not.toHaveBeenCalled()
     expect(ads.results()).toEqual([{ type: 'Interstitial', state: 'empty' }])

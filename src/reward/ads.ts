@@ -18,6 +18,7 @@ export type LadderOfPath = (path: string) => string[] | null
 export interface RewardCascade {
   group: string
   ladderOfPath: LadderOfPath
+  rebid?: boolean
 }
 
 interface SlotEvent {
@@ -90,7 +91,8 @@ export function showRewardedAd(paths: string[], target: Window = window, rewardC
       cascade = null
       const ladder = rewardCascade?.ladderOfPath(path)
       const slot = current
-      if (ladder && safely(() => slot.setConfig({ targeting: tryTargeting(ladder, 1) })) !== null) {
+      const firstTry = ladder ? safely(() => slot.setConfig({ targeting: tryTargeting(ladder, 1) })) : null
+      if (ladder && firstTry !== null && rewardCascade?.rebid) {
         cascade = startCascade({ target, googletag, slot, ladder, onStall: () => moveOn(googletag, slot) })
       }
       googletag.display(current)

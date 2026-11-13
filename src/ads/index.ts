@@ -6,7 +6,7 @@
 import { sendBeacon } from '../core/beacon'
 import { blockAllowed } from '../core/paths'
 import type { Device, PublicAdTag, PublicBlock } from '../core/types'
-import { CASCADE_KINDS, startCascade, type Cascade } from './cascade'
+import { CASCADE_KINDS, SINGLE_TRY_KINDS, startCascade, type Cascade } from './cascade'
 import { ensureGpt, gptReady, type GoogleTag, type GptSlot, type GptSlotEvent } from './gpt'
 import { addLabels, blockElementId, placeBlock } from './placement'
 import { startRefresh } from './refresh'
@@ -16,7 +16,7 @@ import { networkOfPath, pageKeyValues } from './targeting'
 export { ensureGpt, GPT_SOURCE, gptReady, type GoogleTag, type GptSlot } from './gpt'
 export { sponsoredLabel } from './labels'
 export { addLabels, blockElementId, placeBlock } from './placement'
-export { CASCADE_KINDS, startCascade, tryTargeting, type Cascade } from './cascade'
+export { CASCADE_KINDS, SINGLE_TRY_KINDS, startCascade, tryTargeting, type Cascade } from './cascade'
 export { MAX_REFRESHES, startRefresh } from './refresh'
 export { overlayCovers } from './security'
 export { networkOfPath, pageKeyValues, wordpressPostId } from './targeting'
@@ -127,7 +127,8 @@ export function startAds(config: PublicAdTag, deps: AdsDeps): AdsRun {
         const path = blockPath(block, deps.device) as string
         const slot = defineSlot(googletag, block, path, deps.device)
         if (!slot) continue
-        const slotTargeting = extra?.slot(path, CASCADE_KINDS.includes(block.kind)) ?? {}
+        const firstTry = CASCADE_KINDS.includes(block.kind) || SINGLE_TRY_KINDS.includes(block.kind)
+        const slotTargeting = extra?.slot(path, firstTry) ?? {}
         if (Object.keys(slotTargeting).length > 0) slot.setConfig({ targeting: slotTargeting })
         slot.addService(googletag.pubads())
         const found = { block, slot, container }

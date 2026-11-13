@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { showRewardedAd } from '../../src/reward/ads'
 import { VISITOR_KEY } from '../../src/page-views'
-import { REWARD_CASCADE_ENABLED } from '../../src/ads/cascade'
+import { REWARD_CASCADE_ENABLED, REWARD_REBID_ENABLED } from '../../src/ads/cascade'
 import { apiOrigin, armTrigger, rewardCascade, startReward } from '../../src/reward/start'
 import { renderReward } from '../../src/reward/render'
 import { rewardSteps, stepEventName } from '../../src/reward/steps'
@@ -367,11 +367,24 @@ describe('Cascata no anúncio premiado', () => {
     return { listeners: emitter(listeners), slots, refresh, destroySlots, defineOutOfPageSlot, empty, pageConfigs, slotFailure }
   }
 
-  const ladderOf = { group: 'regra', ladderOfPath: (path: string): string[] | null => (path === PATH_A ? LADDER : null) }
+  const ladderOf = {
+    group: 'regra',
+    rebid: true,
+    ladderOfPath: (path: string): string[] | null => (path === PATH_A ? LADDER : null),
+  }
 
   afterEach(() => {
     vi.useRealTimers()
     delete (window as Window & { googletag?: unknown }).googletag
+  })
+
+  it('sem rebid (o padrão): 1º degrau com groone_try=1 e, vazio, segue para o próximo caminho', () => {
+    const { slots, refresh, defineOutOfPageSlot, empty } = cascadeGoogleTag()
+    void showRewardedAd([PATH_A, PATH_B], window, { ...ladderOf, rebid: false })
+    expect(slots[0]?.targeting).toEqual({ groone_prices: '1.22', groone_try: '1' })
+    empty(slots[0] as object)
+    expect(refresh).not.toHaveBeenCalled()
+    expect(defineOutOfPageSlot).toHaveBeenCalledTimes(2)
   })
 
   it('refaz o pedido do mesmo slot com o próximo degrau, sem definir outro', () => {
@@ -463,8 +476,10 @@ describe('Cascata no anúncio premiado', () => {
   describe('rewardCascade', () => {
     const rules = { control_percent: 0, cascades: { RewardsA: LADDER } }
 
-    it('a flag fica desligada por padrão', () => {
-      expect(REWARD_CASCADE_ENABLED).toBe(false)
+    it('a escada liga por padrão só com o 1º degrau: o rebid fica desligado (o GPT não refaz o pedido do REWARDED)', () => {
+      expect(REWARD_CASCADE_ENABLED).toBe(true)
+      expect(REWARD_REBID_ENABLED).toBe(false)
+      expect(rewardCascade(rules, () => 'visitante')?.rebid).toBe(false)
     })
 
     it('com a flag desligada não monta escada, mesmo com regra', () => {
@@ -568,11 +583,10 @@ describe('Cascata no anúncio premiado', () => {
       return { widget, stored, pageConfigs, slots }
     }
 
-    it('com a flag desligada não grava o visitante nem mexe no GPT', async () => {
-      const { widget, stored, pageConfigs } = await runStart({ control_percent: 0, cascades: { RewardsA: LADDER } })
+    it('com a escada ligada grava o visitante e manda o reward com o 1º degrau, sem rebid', async () => {
+      const { widget, stored } = await runStart({ control_percent: 0, cascades: { RewardsA: LADDER } })
       expect(widget).not.toBeNull()
-      expect(stored).not.toContain(VISITOR_KEY)
-      expect(pageConfigs).toEqual([])
+      expect(stored).toContain(VISITOR_KEY)
     })
 
     it('sem price_rules também não grava o visitante', async () => {
