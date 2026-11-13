@@ -30,5 +30,7 @@ pedidos ao GAM com `groone_try=1..4` no targeting do slot (`prev_scp`), a 4ª se
 | Intersticial | 1 pedido: o `refresh()` do slot vazio não gera pedido novo | igual |
 | Reward | 1 pedido: o `refresh()` do slot vazio não gera pedido novo | o GPT nem pediu o anúncio |
 
+O caso `content-lazy` entrou no script depois dessa rodada e ainda não rodou.
+
 O rebid pelo `refresh()` do mesmo slot funciona na âncora, no fixo e no conteúdo. No intersticial
 e no reward, não: o GPT aceita a chamada, mas não faz o pedido.

@@ -33,11 +33,14 @@ async function runFormat(browser, format, deviceName) {
     await page.waitForTimeout(4000)
     await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
   }
-  await page.waitForFunction(() => window.__resultado?.fim === true, null, { timeout: WAIT_MS }).catch(() => null)
+  const finished = await page
+    .waitForFunction(() => window.__resultado?.fim === true, null, { timeout: WAIT_MS })
+    .then(() => true)
+    .catch(() => false)
   await page.waitForTimeout(1500)
   const result = await page.evaluate(() => window.__resultado)
   await context.close()
-  return { aparelho: deviceName ?? 'desktop', pedidos_ao_gam: adRequests.length, parametros: adRequests, ...result }
+  return { aparelho: deviceName ?? 'desktop', terminou: finished, pedidos_ao_gam: adRequests.length, parametros: adRequests, ...result }
 }
 
 const browser = await chromium.launch({ headless: false, channel: process.env.CANAL ?? 'chrome' }).catch(() =>

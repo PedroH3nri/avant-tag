@@ -134,7 +134,7 @@ export function startAds(config: PublicAdTag, deps: AdsDeps): AdsRun {
         defined.push(found)
         const ladder = CASCADE_KINDS.includes(block.kind) ? extra?.cascade?.(path) : null
         if (ladder) {
-          cascades.set(slot, startCascade({ googletag, slot, ladder }))
+          cascades.set(slot, startCascade({ target, googletag, slot, ladder, onStall: () => settleEmpty(found) }))
         }
       }
       /** Grava o bloco como vazio; o `onEmpty` (artigo MGID) roda uma vez só por bloco na página. */

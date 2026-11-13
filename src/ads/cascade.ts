@@ -13,10 +13,14 @@ export const CASCADE_KINDS: readonly BlockKind[] = ['anchor', 'fixed', 'content'
 
 export const REWARD_CASCADE_ENABLED = false
 
+export const CASCADE_STALL_MS = 5000
+
 export interface CascadeDeps {
+  target: Window
   googletag: { pubads(): { refresh(slots: GptSlot[]): void } }
   slot: GptSlot
   ladder: string[]
+  onStall?: () => void
 }
 
 export interface Cascade {
@@ -34,18 +38,26 @@ export function tryTargeting(ladder: string[], attempt: number): Record<string, 
 
 /**
  * Começa o laço do slot; o teto conta do 1º `slotRequested` (sem ele, da montagem) e só impede um
- * novo pedido: a tentativa no ar termina, e só o vazio dela encerra o laço.
+ * novo pedido. Pedido que saiu e ficou 5 s sem resposta encerra o laço e avisa `onStall`.
  */
 export function startCascade(deps: CascadeDeps): Cascade {
-  const { googletag, slot, ladder } = deps
+  const { target, googletag, slot, ladder } = deps
   let startedAt = Date.now()
   let requestSeen = false
   let attempt = 1
   let finished = false
+  let stallTimer: number | null = null
 
-  /** Encerra o laço; até aqui ainda há uma tentativa no ar. */
+  /** Desliga o relógio do pedido no ar. */
+  function clearStall(): void {
+    if (stallTimer !== null) target.clearTimeout(stallTimer)
+    stallTimer = null
+  }
+
+  /** Encerra o laço. */
   function finish(): void {
     finished = true
+    clearStall()
   }
 
   /** Pede o slot de novo com a próxima tentativa. */
@@ -57,6 +69,7 @@ export function startCascade(deps: CascadeDeps): Cascade {
 
   return {
     onEmpty: () => {
+      clearStall()
       if (finished) return false
       const expired = Date.now() - startedAt > CASCADE_MAX_MS
       if (expired || attempt >= CASCADE_TRIES || safely(rebid) === null) {
@@ -66,9 +79,14 @@ export function startCascade(deps: CascadeDeps): Cascade {
       return true
     },
     requested: () => {
-      if (requestSeen || finished) return
+      if (finished) return
+      if (!requestSeen) startedAt = Date.now()
       requestSeen = true
-      startedAt = Date.now()
+      clearStall()
+      stallTimer = target.setTimeout(() => {
+        finish()
+        deps.onStall?.()
+      }, CASCADE_STALL_MS)
     },
     restart: () => {
       if (!finished || safely(() => slot.setConfig({ targeting: tryTargeting(ladder, 1) })) === null) return false

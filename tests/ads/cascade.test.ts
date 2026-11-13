@@ -165,7 +165,7 @@ describe('startCascade', () => {
       throw new Error('GPT')
     })
     const slot = fake.googletag.defineOutOfPageSlot(ANCHOR_PATH, 3) as GptSlot
-    const cascade = startCascade({ googletag: fake.googletag, slot, ladder: LADDER })
+    const cascade = startCascade({ target: window, googletag: fake.googletag, slot, ladder: LADDER })
     expect(cascade.onEmpty()).toBe(false)
   })
 })
@@ -226,6 +226,30 @@ describe('laço da Cascata', () => {
     expect(ads.results()).toEqual([{ type: 'Anchor', state: 'empty' }])
     expect(onEmpty).toHaveBeenCalledTimes(1)
     expect(fake.refresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('pedido que saiu e ficou 5 s sem resposta encerra o laço e grava empty uma vez', async () => {
+    const { fake, ads, onEmpty } = await setup([block({})])
+    const slot = fake.slots[0] as GptSlot
+    fake.emit('slotRequested', { slot })
+    fake.emit('slotRenderEnded', { slot, isEmpty: true })
+    fake.emit('slotRequested', { slot })
+    await vi.advanceTimersByTimeAsync(4_999)
+    expect(onEmpty).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(ads.results()).toEqual([{ type: 'Anchor', state: 'empty' }])
+    expect(onEmpty).toHaveBeenCalledTimes(1)
+    fake.emit('slotRenderEnded', { slot, isEmpty: true })
+    expect(onEmpty).toHaveBeenCalledTimes(1)
+    expect(fake.refresh).toHaveBeenCalledTimes(1)
+  })
+
+  it('pedido adiado pelo carregamento sob demanda (sem slotRequested) não conta como sem resposta', async () => {
+    const { fake, onEmpty } = await setup([block({})])
+    const slot = fake.slots[0] as GptSlot
+    fake.emit('slotRenderEnded', { slot, isEmpty: true })
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(onEmpty).not.toHaveBeenCalled()
   })
 
   it('a tentativa no ar depois do teto ainda pode encher', async () => {
@@ -352,7 +376,7 @@ describe('laço da Cascata', () => {
     expect(ads.results()).toEqual([{ type: 'Anchor', state: 'empty' }])
   })
 
-  it('o refresh por tempo que pula a vez não gasta uma das 5', async () => {
+  it('o refresh por tempo que pula a vez tenta de novo no segundo seguinte e não gasta uma das 5', async () => {
     const report = observeVisibility()
     const { fake } = await setup([block({ refresh_seconds: 30 })])
     const slot = fake.slots[0] as FakeSlot
@@ -362,6 +386,9 @@ describe('laço da Cascata', () => {
     expect(fake.refresh).toHaveBeenCalledTimes(1)
     await vi.advanceTimersByTimeAsync(30_000 * 3)
     expect(fake.refresh).toHaveBeenCalledTimes(1)
+    fake.emit('slotRenderEnded', { slot, isEmpty: false })
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(fake.refresh).toHaveBeenCalledTimes(2)
     for (let count = 0; count < 6; count += 1) {
       fake.emit('slotRenderEnded', { slot, isEmpty: false })
       await vi.advanceTimersByTimeAsync(30_000)
@@ -389,7 +416,7 @@ describe('laço da Cascata', () => {
   it('o refresh por tempo pula a vez enquanto a escada do refresh anterior ainda está no ar', () => {
     const fake = fakeGoogletag()
     const slot = fake.googletag.defineOutOfPageSlot(ANCHOR_PATH, 3) as FakeSlot
-    const cascade = startCascade({ googletag: fake.googletag, slot, ladder: LADDER })
+    const cascade = startCascade({ target: window, googletag: fake.googletag, slot, ladder: LADDER })
     expect(cascade.restart()).toBe(false)
     cascade.done()
     expect(cascade.restart()).toBe(true)
@@ -401,7 +428,7 @@ describe('laço da Cascata', () => {
   it('se o setConfig do recomeço falha, o refresh pula a vez e o laço não muda', () => {
     const fake = fakeGoogletag()
     const slot = fake.googletag.defineOutOfPageSlot(ANCHOR_PATH, 3) as FakeSlot
-    const cascade = startCascade({ googletag: fake.googletag, slot, ladder: LADDER })
+    const cascade = startCascade({ target: window, googletag: fake.googletag, slot, ladder: LADDER })
     cascade.done()
     slot.setConfig = () => {
       throw new Error('GPT')

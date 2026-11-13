@@ -37,7 +37,11 @@ export function startRefresh(
     if (elapsed < seconds * 1000) return
     elapsed = 0
     googletag.cmd.push(() => {
-      if (count >= MAX_REFRESHES || (beforeRefresh && !beforeRefresh())) return
+      if (count >= MAX_REFRESHES) return
+      if (beforeRefresh && !beforeRefresh()) {
+        elapsed = seconds * 1000
+        return
+      }
       count += 1
       googletag.pubads().refresh([slot])
       if (count >= MAX_REFRESHES) stop()
