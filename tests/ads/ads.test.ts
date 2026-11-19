@@ -206,6 +206,12 @@ describe('startRefresh', () => {
 })
 
 describe('key-values', () => {
+  it('manda a utm_keyword do Google Ads como as outras UTMs', () => {
+    window.history.pushState({}, '', '/receitas?utm_term=123&utm_keyword=aud-9:kwd-77')
+    expect(pageKeyValues(window)).toMatchObject({ utm_term: '123', utm_keyword: 'aud-9:kwd-77' })
+    window.history.pushState({}, '', '/')
+  })
+
   it('pega o post do shortlink, as UTMs e a network do caminho', () => {
     document.head.innerHTML = '<link rel="shortlink" href="https://blog.com/?p=42">'
     window.history.pushState({}, '', '/receitas/bolo?utm_source=google&utm_medium=cpc')

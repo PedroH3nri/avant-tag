@@ -1,24 +1,24 @@
-# Graph Report - avant-tag  (2026-11-13)
+# Graph Report - avant-tag  (2026-11-19)
 
 ## Corpus Check
-- 89 files · ~53,322 words
+- 89 files · ~53,395 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 5 file(s) not represented in the graph (top: (none) 4, .toml 1)
 
 ## Summary
-- 727 nodes · 1314 edges · 31 communities (29 shown, 2 thin omitted)
+- 723 nodes · 1313 edges · 31 communities (29 shown, 2 thin omitted)
 - Extraction: 98% EXTRACTED · 2% INFERRED · 0% AMBIGUOUS · INFERRED: 27 edges (avg confidence: 0.88)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `373d8b22`
+- Built from commit: `23f2e0de`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - tag.ts
 - reward.test.ts
-- price-rules/index.ts
+- cascade.ts
 - loader/index.ts
 - package.json
 - Avant: models do MVP
@@ -33,7 +33,7 @@
 - Arquitetura do MVP do Avant
 - Requisitos do novo SaaS AdTech Groone
 - Avant: fluxos de login e convite
-- 12. Rewards e quiz (plano)
+- page-views/index.ts
 - Review Focus
 - updates
 - Avant: conexão com o GAM
@@ -51,11 +51,11 @@
 ## God Nodes (most connected - your core abstractions)
 1. `startAds()` - 24 edges
 2. `runTag()` - 22 edges
-3. `RewardWidget` - 16 edges
-4. `renderReward()` - 16 edges
-5. `startReward()` - 15 edges
-6. `compilerOptions` - 14 edges
-7. `vitest` - 14 edges
+3. `renderReward()` - 16 edges
+4. `startReward()` - 16 edges
+5. `RewardWidget` - 16 edges
+6. `vitest` - 14 edges
+7. `compilerOptions` - 14 edges
 8. `Groone Avant: contexto do projeto` - 14 edges
 9. `showRewardedAd()` - 13 edges
 10. `startCascade()` - 12 edges
@@ -78,16 +78,16 @@
 ## Communities (31 total, 2 thin omitted)
 
 ### Community 0 - "tag.ts"
-Cohesion: 0.05
-Nodes (67): vitest, AdsRun, GTAG_SOURCE, GtagWindow, startAnalytics(), cachedConfig(), loadConfig(), localStore() (+59 more)
+Cohesion: 0.07
+Nodes (49): vitest, AdsRun, GTAG_SOURCE, GtagWindow, startAnalytics(), cachedConfig(), loadConfig(), localStore() (+41 more)
 
 ### Community 2 - "reward.test.ts"
 Cohesion: 0.07
 Nodes (45): REWARD_CASCADE_ENABLED, REWARD_REBID_ENABLED, AdOutcome, FONT_STACKS, fontStylesheet(), OFFERWALL_SELECTOR, OFFERWALL_WAIT_MS, RenderOptions (+37 more)
 
-### Community 3 - "price-rules/index.ts"
+### Community 3 - "cascade.ts"
 Cohesion: 0.05
-Nodes (44): Cascade, CASCADE_KINDS, CASCADE_STALL_MS, startCascade(), clearStall(), finish(), rebid(), tryTargeting() (+36 more)
+Nodes (48): Cascade, CASCADE_KINDS, CASCADE_STALL_MS, LADDER_KINDS, SINGLE_TRY_KINDS, startCascade(), clearStall(), finish() (+40 more)
 
 ### Community 4 - "loader/index.ts"
 Cohesion: 0.09
@@ -118,8 +118,8 @@ Cohesion: 0.12
 Nodes (16): API first e chaves de API, Atribuição de sites, Avant: endpoints da API do MVP, Catálogo de permissões, Convenções, Convites, Decisões de Pedro (23/10/2026), Empresa (+8 more)
 
 ### Community 11 - "ads/index.ts"
-Cohesion: 0.05
-Nodes (43): Rotas (avant-api), CascadeDeps, LADDER_KINDS, SINGLE_TRY_KINDS, ensureGpt(), GoogleTag, GPT_SOURCE, gptReady() (+35 more)
+Cohesion: 0.06
+Nodes (38): CascadeDeps, ensureGpt(), GoogleTag, GPT_SOURCE, gptReady(), GptSlot, GptSlotEvent, GptWindow (+30 more)
 
 ### Community 12 - "steps"
 Cohesion: 0.12
@@ -145,9 +145,9 @@ Nodes (11): Conta e equipe, Escopo herdado do Genius, Integrações e onboarding
 Cohesion: 0.17
 Nodes (11): 2FA, Avant: fluxos de login e convite, Com Google, Com senha, Convite e primeiro acesso, Decisões de Pedro (23/10/2026), Endpoints de autenticação, Escolha da Empresa ativa (+3 more)
 
-### Community 18 - "12. Rewards e quiz (plano)"
-Cohesion: 0.20
-Nodes (9): 12. Rewards e quiz (plano), Decisões já tomadas com o Pedro, Infra (avant-infra), Modelo (avant-core, domínio novo `rewards/`), O que já existe e o reward usa, Ordem e issues, Respostas do Pedro (09/11), Script do site e telas (avant-web) (+1 more)
+### Community 18 - "page-views/index.ts"
+Cohesion: 0.10
+Nodes (28): 12. Rewards e quiz (plano), Decisões já tomadas com o Pedro, Infra (avant-infra), Modelo (avant-core, domínio novo `rewards/`), O que já existe e o reward usa, Ordem e issues, Respostas do Pedro (09/11), Rotas (avant-api) (+20 more)
 
 ### Community 19 - "Review Focus"
 Cohesion: 0.17
@@ -199,17 +199,17 @@ Nodes (16): 13. Ad tag, Ajustes do protótipo (Pedro, 09/11), Como o Genius faz 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `vitest` connect `tag.ts` to `reward.test.ts`, `price-rules/index.ts`, `loader/index.ts`, `package.json`, `ads/index.ts`?**
+- **Why does `vitest` connect `tag.ts` to `reward.test.ts`, `cascade.ts`, `loader/index.ts`, `package.json`, `ads/index.ts`, `page-views/index.ts`?**
   _High betweenness centrality (0.136) - this node is a cross-community bridge._
 - **Are the 4 inferred relationships involving `startAds()` (e.g. with `.display()` and `.enableServices()`) actually correct?**
   _`startAds()` has 4 INFERRED edges - model-reasoned connections that need verification._
 - **Should `tag.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.05263157894736842 - nodes in this community are weakly interconnected._
-- **Why does `sendBeacon()` connect `ads/index.ts` to `tag.ts`, `Review Focus`, `13. Ad tag`?**
+  _Cohesion score 0.06659056316590563 - nodes in this community are weakly interconnected._
+- **Why does `sendBeacon()` connect `page-views/index.ts` to `ads/index.ts`, `tag.ts`, `Review Focus`, `13. Ad tag`?**
   _High betweenness centrality (0.074) - this node is a cross-community bridge._
 - **Should `reward.test.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.07042253521126761 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.07370600414078675 - nodes in this community are weakly interconnected._
 - **Why does `typescript` connect `package.json` to `clean-code.mjs`?**
   _High betweenness centrality (0.060) - this node is a cross-community bridge._
-- **Should `price-rules/index.ts` be split into smaller, more focused modules?**
-  _Cohesion score 0.05268065268065268 - nodes in this community are weakly interconnected._
+- **Should `cascade.ts` be split into smaller, more focused modules?**
+  _Cohesion score 0.0504828797190518 - nodes in this community are weakly interconnected._
