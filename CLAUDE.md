@@ -18,6 +18,9 @@ de mudar algo.
 - Clean code obrigatório (skill `avant-clean-code`): nomes claros, nada de nome de uma letra (nem
   em callback), toda função com um comentário de 1 ou 2 linhas sobre o que faz, nada de
   comentário ao lado do código. Conferido por `pnpm clean-code`.
+- Segurança obrigatória (skill `avant-seguranca`, decisão 18): nada de segredo ou dado bancário
+  em resposta, log ou lista; acesso declarado em toda rota; isolamento por Empresa com teste de
+  outra Empresa; checagem da skill antes do PR.
 - Antes de abrir PR: `pnpm lint && pnpm clean-code && pnpm typecheck && pnpm test && pnpm build && pnpm size`.
 - Nada de segredos no repositório.
 - PRs vão para `pre-develop`; a promoção para `develop` passa por revisão e CI (skill `avant-fluxo-de-trabalho`).
