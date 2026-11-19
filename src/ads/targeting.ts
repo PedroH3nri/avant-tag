@@ -1,11 +1,11 @@
 /**
  * Os key-values da página, como a g-tag: `id_post_wp` do `shortlink` do WordPress, `land_uri`,
- * `content_hash` e as UTMs (até 60 caracteres cada).
+ * `content_hash` e as UTMs, com a `utm_keyword` do Google Ads (até 60 caracteres cada).
  */
 
 import { contentHash } from '../core/hash'
 
-export const UTM_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content']
+export const UTM_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_term', 'utm_content', 'utm_keyword']
 const MAX_VALUE = 60
 
 /** O id do post do WordPress pelo `<link rel="shortlink" href="...?p=123">`. */
